@@ -9,10 +9,25 @@ import type { VoteStatus } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
-const TIER_META: Record<Tier, { dot: string; label: string; ring: string }> = {
-  green: { dot: '🟢', label: '확정 추천', ring: 'border-emerald-200 bg-emerald-50/60' },
-  yellow: { dot: '🟡', label: '조건부', ring: 'border-amber-200 bg-amber-50/50' },
-  gray: { dot: '⚪', label: '탈락', ring: 'border-slate-200 bg-white' },
+const TIER_META: Record<Tier, { dot: string; label: string; card: string; pill: string }> = {
+  green: {
+    dot: '🟢',
+    label: '확정 추천',
+    card: 'bg-ok-light',
+    pill: 'bg-ok text-white',
+  },
+  yellow: {
+    dot: '🟡',
+    label: '조건부',
+    card: 'bg-maybe-light',
+    pill: 'bg-maybe text-white',
+  },
+  gray: {
+    dot: '⚪',
+    label: '탈락',
+    card: 'card',
+    pill: 'bg-surface-sunken text-ink-600',
+  },
 }
 
 export default function ResultPage({
@@ -35,11 +50,11 @@ export default function ResultPage({
   return (
     <main>
       <header className="mb-4">
-        <Link href="/" className="text-xs text-slate-400">
+        <Link href="/" className="text-[13px] font-bold text-ink-500">
           ← 서른픽
         </Link>
-        <h1 className="mt-1 text-lg font-extrabold leading-snug">{poll.title}</h1>
-        <p className="mt-0.5 text-xs text-slate-400">
+        <h1 className="mt-1.5 text-[22px] font-extrabold leading-snug text-ink">{poll.title}</h1>
+        <p className="mt-1 text-[13px] font-medium text-ink-500">
           {poll.hostName}님의 모임, 정족수 {poll.quorum}명, 멤버 {members.length}명
         </p>
       </header>
@@ -50,23 +65,19 @@ export default function ResultPage({
 
       {/* 확정됨 / 추천 배너 */}
       {confirmedDate ? (
-        <div className="mb-4 rounded-2xl border border-emerald-300 bg-emerald-50 p-4">
-          <p className="text-xs font-semibold text-emerald-600">✅ 날짜가 확정됐어요</p>
-          <p className="mt-1 text-2xl font-extrabold text-emerald-900">
+        <div className="mb-4 rounded-2xl bg-ok-light p-5">
+          <p className="text-[13px] font-bold text-ok-ink">✅ 날짜가 확정됐어요</p>
+          <p className="mt-1.5 text-[28px] font-extrabold leading-tight text-ink">
             {formatKo(confirmedDate.date)}
           </p>
-          <div className="mt-3 flex items-center gap-2">
+          <div className="mt-4 flex items-center gap-2">
             <a
               href={`/api/poll/${poll.id}/ics?dateId=${confirmedDate.id}`}
-              className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white"
+              className="rounded-xl bg-ok px-4 py-2.5 text-sm font-bold text-white active:scale-95"
             >
-              📅 캘린더에 저장(.ics)
+              📅 캘린더에 저장
             </a>
-            <ConfirmButton
-              pollId={poll.id}
-              pollDateId={confirmedDate.id}
-              confirmed
-            />
+            <ConfirmButton pollId={poll.id} pollDateId={confirmedDate.id} confirmed />
           </div>
         </div>
       ) : (
@@ -74,27 +85,28 @@ export default function ResultPage({
       )}
 
       {/* 응답 현황 */}
-      <section className="mb-5 rounded-2xl border border-slate-200 bg-white p-4">
-        <div className="mb-2 flex items-center justify-between">
-          <p className="text-sm font-semibold">응답 현황</p>
-          <p className="text-sm font-bold text-brand">
-            {rec.respondedMembers}/{rec.totalMembers}명
+      <section className="card mb-6 p-5">
+        <div className="mb-2.5 flex items-baseline justify-between">
+          <p className="text-[15px] font-bold text-ink">응답 현황</p>
+          <p className="text-[15px] font-bold text-brand">
+            {rec.respondedMembers}
+            <span className="text-ink-400"> / {rec.totalMembers}명</span>
           </p>
         </div>
-        <div className="h-2 overflow-hidden rounded-full bg-slate-100">
+        <div className="h-2.5 overflow-hidden rounded-full bg-surface-sunken">
           <div
             className="h-full rounded-full bg-brand transition-all"
             style={{ width: `${(rec.respondedMembers / Math.max(1, rec.totalMembers)) * 100}%` }}
           />
         </div>
         {rec.noResponseMembers.length > 0 ? (
-          <div className="mt-3">
-            <p className="mb-1.5 text-xs text-slate-400">아직 응답 안 한 사람</p>
+          <div className="mt-4">
+            <p className="mb-2 text-xs font-bold text-ink-500">아직 응답 안 한 사람</p>
             <div className="flex flex-wrap gap-1.5">
               {rec.noResponseMembers.map((n) => (
                 <span
                   key={n}
-                  className="rounded-full border border-dashed border-slate-300 px-2.5 py-1 text-xs text-slate-500"
+                  className="rounded-full border border-dashed border-line-strong px-3 py-1 text-[13px] font-medium text-ink-600"
                 >
                   {n}
                 </span>
@@ -102,14 +114,14 @@ export default function ResultPage({
             </div>
           </div>
         ) : (
-          <p className="mt-3 text-xs font-medium text-emerald-600">🎉 전원 응답 완료!</p>
+          <p className="mt-4 text-[13px] font-bold text-ok-ink">🎉 전원 응답 완료!</p>
         )}
       </section>
 
       {/* 후보 날짜 (랭킹순) */}
-      <section className="mb-5">
-        <h2 className="mb-2 text-sm font-semibold text-slate-600">후보 날짜 (추천순)</h2>
-        <div className="space-y-3">
+      <section className="mb-6">
+        <h2 className="mb-2.5 text-[15px] font-bold text-ink">후보 날짜 추천순</h2>
+        <div className="space-y-2.5">
           {rec.ranked.map((a, i) => (
             <DateCard
               key={a.pollDateId}
@@ -123,13 +135,13 @@ export default function ResultPage({
       </section>
 
       {/* 한눈에 그리드 */}
-      <section className="mb-6">
-        <h2 className="mb-2 text-sm font-semibold text-slate-600">한눈에 보기 (사람 × 날짜)</h2>
+      <section className="mb-7">
+        <h2 className="mb-2.5 text-[15px] font-bold text-ink">한눈에 보기</h2>
         <Grid bundle={bundle} />
       </section>
 
       <div className="text-center">
-        <Link href={`/poll/${poll.id}`} className="text-sm font-medium text-brand">
+        <Link href={`/poll/${poll.id}`} className="text-sm font-bold text-brand">
           ← 내 투표 수정하러 가기
         </Link>
       </div>
@@ -139,23 +151,17 @@ export default function ResultPage({
 
 // ── 추천 배너 ─────────────────────────────────────────────────────────────────
 
-function RecommendBanner({
-  rec,
-  pollId,
-}: {
-  rec: ReturnType<typeof analyze>
-  pollId: string
-}) {
+function RecommendBanner({ rec, pollId }: { rec: ReturnType<typeof analyze>; pollId: string }) {
   if (rec.best) {
     const a = rec.best
     return (
-      <div className="mb-4 rounded-2xl border border-emerald-300 bg-emerald-50 p-4">
-        <p className="text-xs font-semibold text-emerald-600">🟢 이 날이 제일 좋아요</p>
-        <p className="mt-1 text-2xl font-extrabold text-emerald-900">{formatKo(a.date)}</p>
-        <p className="mt-1 text-sm text-emerald-700">
+      <div className="mb-4 rounded-2xl bg-ok-light p-5">
+        <p className="text-[13px] font-bold text-ok-ink">🟢 이 날이 제일 좋아요</p>
+        <p className="mt-1.5 text-[28px] font-extrabold leading-tight text-ink">{formatKo(a.date)}</p>
+        <p className="mt-1.5 text-sm font-medium text-ink-700">
           가능 {a.count}명, 필수 참석자 전원 OK, 정족수 충족
         </p>
-        <div className="mt-3">
+        <div className="mt-4">
           <ConfirmButton pollId={pollId} pollDateId={a.pollDateId} confirmed={false} variant="primary" />
         </div>
       </div>
@@ -165,18 +171,18 @@ function RecommendBanner({
   if (rec.bestFallback) {
     const a = rec.bestFallback
     return (
-      <div className="mb-4 rounded-2xl border border-amber-300 bg-amber-50 p-4">
-        <p className="text-xs font-semibold text-amber-600">🟡 아직 확정 추천이 없어요</p>
-        <p className="mt-1 text-xl font-extrabold text-amber-900">
-          가장 근접: {formatKo(a.date)}
+      <div className="mb-4 rounded-2xl bg-maybe-light p-5">
+        <p className="text-[13px] font-bold text-maybe-ink">🟡 아직 확정 추천이 없어요</p>
+        <p className="mt-1.5 text-[22px] font-extrabold leading-tight text-ink">
+          가장 근접 {formatKo(a.date)}
         </p>
-        <ul className="mt-1.5 space-y-0.5 text-sm text-amber-800">
+        <ul className="mt-2 space-y-1 text-sm font-medium text-ink-700">
           {a.reasons.map((r) => (
             <li key={r}>• {r}</li>
           ))}
         </ul>
         {a.canBecomeGreen && (
-          <p className="mt-2 rounded-lg bg-white/70 px-2.5 py-1.5 text-xs text-amber-700">
+          <p className="mt-3 rounded-xl bg-white/70 px-3 py-2 text-[13px] font-medium text-maybe-ink">
             💡 미응답 {a.noneNames.length}명이 모두 가능(O)하면 확정 추천이 돼요
           </p>
         )}
@@ -185,8 +191,9 @@ function RecommendBanner({
   }
 
   return (
-    <div className="mb-4 rounded-2xl border border-slate-200 bg-white p-4 text-center">
-      <p className="text-sm text-slate-500">아직 응답을 기다리고 있어요 🙏</p>
+    <div className="card mb-4 p-6 text-center">
+      <p className="text-3xl">🙏</p>
+      <p className="mt-2 text-sm font-medium text-ink-600">아직 응답을 기다리고 있어요</p>
     </div>
   )
 }
@@ -206,24 +213,25 @@ function DateCard({
 }) {
   const meta = TIER_META[a.tier]
   return (
-    <div className={`rounded-2xl border p-4 ${confirmed ? 'border-emerald-400 bg-emerald-50' : meta.ring}`}>
+    <div className={`rounded-2xl p-4 ${confirmed ? 'bg-ok-light ring-2 ring-ok' : meta.card}`}>
       <div className="flex items-start justify-between gap-2">
         <div>
-          <p className="text-[15px] font-bold">
-            <span className="mr-1 text-xs font-medium text-slate-400">{rank}위</span>
+          <p className="flex items-center gap-1.5 text-[17px] font-extrabold text-ink">
+            <span className="text-xs font-bold text-ink-400">{rank}위</span>
             {formatKo(a.date)}
           </p>
-          <p className="mt-0.5 text-xs font-medium text-slate-500">
-            {meta.dot} {meta.label}, 가능 {a.count}명
-          </p>
+          <div className="mt-1 flex items-center gap-1.5">
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${meta.pill}`}>
+              {meta.dot} {meta.label}
+            </span>
+            <span className="text-[13px] font-bold text-ink-600">가능 {a.count}명</span>
+          </div>
         </div>
         {a.tier === 'green' && !confirmed && (
           <ConfirmButton pollId={pollId} pollDateId={a.pollDateId} confirmed={false} />
         )}
         {confirmed && (
-          <span className="rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white">
-            확정됨
-          </span>
+          <span className="rounded-xl bg-ok px-3 py-1.5 text-[13px] font-bold text-white">확정됨</span>
         )}
       </div>
 
@@ -237,7 +245,7 @@ function DateCard({
 
       {/* 사유 */}
       {a.reasons.length > 0 && (
-        <ul className="mt-3 space-y-0.5 border-t border-slate-200/70 pt-2.5 text-xs text-slate-500">
+        <ul className="mt-3 space-y-1 border-t border-line/70 pt-3 text-[13px] font-medium text-ink-600">
           {a.reasons.map((r) => (
             <li key={r}>• {r}</li>
           ))}
@@ -246,15 +254,15 @@ function DateCard({
 
       {/* 도달 가능 시나리오 */}
       {a.canBecomeGreen && (
-        <p className="mt-2 rounded-lg bg-brand/5 px-2.5 py-1.5 text-xs text-brand-700">
+        <p className="mt-2.5 rounded-xl bg-brand-light px-3 py-2 text-[13px] font-medium text-brand-dark">
           💡 미응답 {a.noneNames.length}명이 모두 가능하면 🟢 확정 추천 ({a.potentialCount}명)
         </p>
       )}
 
-      <div className="mt-3 flex items-center gap-3">
+      <div className="mt-3">
         <a
           href={`/api/poll/${pollId}/ics?dateId=${a.pollDateId}`}
-          className="text-xs font-medium text-slate-400 hover:text-brand"
+          className="text-[13px] font-bold text-ink-400 active:text-brand"
         >
           📅 .ics 저장
         </a>
@@ -264,10 +272,10 @@ function DateCard({
 }
 
 const CHIP_META: Record<VoteStatus | 'none', { label: string; cls: string }> = {
-  O: { label: 'O', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
-  '△': { label: '△', cls: 'bg-amber-50 text-amber-700 border-amber-200' },
-  X: { label: 'X', cls: 'bg-slate-100 text-slate-500 border-slate-200' },
-  none: { label: '미응답', cls: 'bg-white text-slate-400 border-dashed border-slate-300' },
+  O: { label: 'O', cls: 'bg-ok-light text-ok-ink' },
+  '△': { label: '△', cls: 'bg-maybe-light text-maybe-ink' },
+  X: { label: 'X', cls: 'bg-surface-sunken text-no-ink' },
+  none: { label: '미응답', cls: 'border border-dashed border-line-strong text-ink-400' },
 }
 
 function ChipRow({ status, names }: { status: VoteStatus | 'none'; names: string[] }) {
@@ -275,11 +283,11 @@ function ChipRow({ status, names }: { status: VoteStatus | 'none'; names: string
   const m = CHIP_META[status]
   return (
     <div className="flex flex-wrap items-center gap-1">
-      <span className="mr-1 inline-block min-w-[1.5rem] shrink-0 text-xs font-bold text-slate-400">
+      <span className="mr-1 inline-block min-w-[1.4rem] shrink-0 text-[13px] font-extrabold text-ink-400">
         {m.label}
       </span>
       {names.map((n) => (
-        <span key={n} className={`rounded-full border px-2 py-0.5 text-xs ${m.cls}`}>
+        <span key={n} className={`rounded-full px-2.5 py-0.5 text-[13px] font-bold ${m.cls}`}>
           {n}
         </span>
       ))}
@@ -298,26 +306,26 @@ function Grid({ bundle }: { bundle: ReturnType<typeof getPollBundle> }) {
   const cellCls = (s: VoteStatus | undefined) => {
     switch (s) {
       case 'O':
-        return 'bg-emerald-500 text-white'
+        return 'bg-ok text-white'
       case '△':
-        return 'bg-amber-400 text-white'
+        return 'bg-maybe text-white'
       case 'X':
-        return 'bg-slate-300 text-slate-600'
+        return 'bg-line text-ink-600'
       default:
-        return 'bg-slate-50 text-slate-300'
+        return 'bg-surface-sunken text-ink-400'
     }
   }
 
   return (
-    <div className="thin-scroll overflow-x-auto rounded-2xl border border-slate-200 bg-white">
-      <table className="w-full border-collapse text-center text-xs">
+    <div className="thin-scroll card overflow-x-auto">
+      <table className="w-full border-collapse text-center text-[13px]">
         <thead>
           <tr>
-            <th className="sticky left-0 z-10 bg-white px-2 py-2 text-left font-semibold text-slate-500">
+            <th className="sticky left-0 z-10 bg-white px-3 py-2.5 text-left text-xs font-bold text-ink-500">
               멤버
             </th>
             {dates.map((d) => (
-              <th key={d.id} className="px-1 py-2 font-semibold text-slate-500">
+              <th key={d.id} className="px-1 py-2.5 text-xs font-bold text-ink-500">
                 {formatShort(d.date)}
               </th>
             ))}
@@ -325,8 +333,8 @@ function Grid({ bundle }: { bundle: ReturnType<typeof getPollBundle> }) {
         </thead>
         <tbody>
           {members.map((m) => (
-            <tr key={m.id} className="border-t border-slate-100">
-              <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-2 py-1.5 text-left font-medium text-slate-700">
+            <tr key={m.id} className="border-t border-line/60">
+              <td className="sticky left-0 z-10 whitespace-nowrap bg-white px-3 py-1.5 text-left font-bold text-ink-800">
                 {m.isAnchor && <span className="mr-0.5">⭐</span>}
                 {m.name}
               </td>
@@ -335,7 +343,7 @@ function Grid({ bundle }: { bundle: ReturnType<typeof getPollBundle> }) {
                 return (
                   <td key={d.id} className="px-1 py-1.5">
                     <span
-                      className={`mx-auto flex h-7 w-7 items-center justify-center rounded-md font-bold ${cellCls(s)}`}
+                      className={`mx-auto flex h-8 w-8 items-center justify-center rounded-lg font-extrabold ${cellCls(s)}`}
                     >
                       {s ?? '–'}
                     </span>

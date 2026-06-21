@@ -11,14 +11,21 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  themeColor: '#6257e6',
+  themeColor: '#3182F6',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ko">
+      <head>
+        {/* 토스풍 한글 타이포를 위한 Pretendard */}
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css"
+        />
+      </head>
       <body>
-        <div className="mx-auto min-h-dvh max-w-md bg-slate-50 px-4 pb-16 pt-5">{children}</div>
+        <div className="mx-auto min-h-dvh max-w-md bg-surface-page px-5 pb-20 pt-6">{children}</div>
       </body>
     </html>
   )

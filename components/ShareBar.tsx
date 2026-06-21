@@ -45,27 +45,27 @@ export default function ShareBar({ pollId, highlight }: Props) {
   return (
     <div
       className={[
-        'rounded-2xl border p-4',
-        highlight ? 'border-brand/30 bg-brand/[0.05]' : 'border-slate-200 bg-white',
+        'rounded-2xl p-4',
+        highlight ? 'bg-brand-light' : 'card',
       ].join(' ')}
     >
       {highlight && (
-        <p className="mb-2 text-sm font-bold text-brand-700">
-          🎉 방이 만들어졌어요! 멤버들에게 투표 링크를 보내세요.
+        <p className="mb-2.5 text-[15px] font-bold text-brand-dark">
+          🎉 방이 만들어졌어요! 멤버들에게 투표 링크를 보내세요
         </p>
       )}
       <div className="flex gap-2">
         <button
           type="button"
           onClick={share}
-          className="flex-1 rounded-xl bg-brand py-3 text-sm font-bold text-white active:scale-[0.99]"
+          className="h-12 flex-1 rounded-xl bg-brand text-[15px] font-bold text-white active:bg-brand-dark active:scale-[0.99]"
         >
-          {copied === 'vote' ? '복사됨 ✓' : '투표 링크 공유'}
+          {copied === 'vote' ? '복사됨 ✓' : '🔗 투표 링크 공유'}
         </button>
         <button
           type="button"
           onClick={() => copy('result')}
-          className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-600 active:scale-[0.99]"
+          className="h-12 shrink-0 rounded-xl bg-white px-4 text-[15px] font-bold text-ink-700 shadow-card active:scale-[0.99]"
         >
           {copied === 'result' ? '복사됨 ✓' : '결과 링크'}
         </button>

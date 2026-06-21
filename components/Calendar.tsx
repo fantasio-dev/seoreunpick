@@ -49,42 +49,43 @@ export default function Calendar({ value, onChange }: Props) {
   }
 
   // 지난 달로는 못 가게 (이번 달 이전 막기)
-  const canGoPrev = view.y > today.getFullYear() || (view.y === today.getFullYear() && view.m > today.getMonth())
+  const canGoPrev =
+    view.y > today.getFullYear() || (view.y === today.getFullYear() && view.m > today.getMonth())
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-3">
-      <div className="mb-2 flex items-center justify-between px-1">
+    <div className="card p-4">
+      <div className="mb-3 flex items-center justify-between">
         <button
           type="button"
           onClick={() => move(-1)}
           disabled={!canGoPrev}
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 disabled:opacity-30"
+          className="flex h-9 w-9 items-center justify-center rounded-xl text-ink-600 active:bg-surface-sunken disabled:opacity-25"
           aria-label="이전 달"
         >
           ‹
         </button>
-        <span className="text-sm font-semibold">
+        <span className="text-[15px] font-bold text-ink">
           {view.y}년 {view.m + 1}월
         </span>
         <button
           type="button"
           onClick={() => move(1)}
-          className="flex h-9 w-9 items-center justify-center rounded-lg text-slate-500"
+          className="flex h-9 w-9 items-center justify-center rounded-xl text-ink-600 active:bg-surface-sunken"
           aria-label="다음 달"
         >
           ›
         </button>
       </div>
 
-      <div className="mb-1 grid grid-cols-7 text-center text-xs text-slate-400">
+      <div className="mb-1 grid grid-cols-7 text-center text-xs font-medium text-ink-400">
         {WEEKDAYS.map((w, i) => (
-          <div key={w} className={i === 0 ? 'text-rose-400' : i === 6 ? 'text-blue-400' : ''}>
+          <div key={w} className={i === 0 ? 'text-rose-400' : i === 6 ? 'text-brand' : ''}>
             {w}
           </div>
         ))}
       </div>
 
-      <div className="grid grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-y-0.5">
         {cells.map((d, i) => {
           if (d === null) return <div key={`e${i}`} />
           const dateStr = ymd(view.y, view.m, d)
@@ -92,25 +93,26 @@ export default function Calendar({ value, onChange }: Props) {
           const isSelected = selected.has(dateStr)
           const isToday = dateStr === todayStr
           return (
-            <button
-              key={dateStr}
-              type="button"
-              disabled={isPast}
-              onClick={() => toggle(dateStr)}
-              className={[
-                'flex aspect-square items-center justify-center rounded-lg text-sm transition',
-                isPast ? 'cursor-not-allowed text-slate-300' : 'active:scale-95',
-                isSelected
-                  ? 'bg-brand font-bold text-white'
-                  : isToday
-                    ? 'border border-brand/40 text-brand'
-                    : !isPast
-                      ? 'text-slate-700 hover:bg-brand/5'
-                      : '',
-              ].join(' ')}
-            >
-              {d}
-            </button>
+            <div key={dateStr} className="flex items-center justify-center py-0.5">
+              <button
+                type="button"
+                disabled={isPast}
+                onClick={() => toggle(dateStr)}
+                className={[
+                  'flex h-10 w-10 items-center justify-center rounded-full text-[15px] transition',
+                  isPast ? 'cursor-not-allowed text-ink-400/50' : 'active:scale-90',
+                  isSelected
+                    ? 'bg-brand font-bold text-white'
+                    : isToday
+                      ? 'font-bold text-brand'
+                      : !isPast
+                        ? 'font-medium text-ink-800 active:bg-brand-light'
+                        : '',
+                ].join(' ')}
+              >
+                {d}
+              </button>
+            </div>
           )
         })}
       </div>

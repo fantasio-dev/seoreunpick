@@ -73,8 +73,9 @@ export default function VoteBoard({ pollId, members, dates, votes }: Props) {
   if (memberId === null) {
     return (
       <div>
-        <h2 className="mb-3 text-base font-bold">당신은 누구인가요?</h2>
-        <div className="grid grid-cols-3 gap-2">
+        <h2 className="mb-1 text-[20px] font-extrabold text-ink">당신은 누구인가요?</h2>
+        <p className="mb-4 text-sm text-ink-600">이름을 선택하면 투표를 시작해요</p>
+        <div className="grid grid-cols-3 gap-2.5">
           {members.map((m) => {
             const voted = existing.has(m.id)
             return (
@@ -82,20 +83,22 @@ export default function VoteBoard({ pollId, members, dates, votes }: Props) {
                 key={m.id}
                 type="button"
                 onClick={() => selectMember(m.id)}
-                className="relative flex h-14 items-center justify-center rounded-xl border border-slate-200 bg-white text-[15px] font-semibold text-slate-700 transition active:scale-95 hover:border-brand/40"
+                className="relative flex h-[68px] flex-col items-center justify-center gap-1 rounded-2xl bg-surface-sunken text-[15px] font-bold text-ink-800 transition active:scale-95"
               >
-                {m.isAnchor && <span className="absolute left-2 top-1.5 text-xs">⭐</span>}
-                {m.name}
+                {m.isAnchor && <span className="absolute left-2 top-2 text-[11px]">⭐</span>}
+                <span>{m.name}</span>
                 {voted && (
-                  <span className="absolute bottom-1 text-[10px] font-medium text-emerald-500">
-                    응답함
+                  <span className="rounded-full bg-ok-light px-1.5 py-px text-[10px] font-bold text-ok-ink">
+                    응답완료
                   </span>
                 )}
               </button>
             )
           })}
         </div>
-        <p className="mt-4 text-center text-xs text-slate-400">⭐ 표시는 필수 참석자예요</p>
+        <p className="mt-5 text-center text-xs font-medium text-ink-500">
+          ⭐ 표시는 꼭 와야 하는 필수 참석자예요
+        </p>
       </div>
     )
   }
@@ -105,22 +108,24 @@ export default function VoteBoard({ pollId, members, dates, votes }: Props) {
   // ── 제출 완료 화면 ─────────────────────────────────────────────────
   if (done) {
     return (
-      <div className="py-6 text-center">
-        <div className="mb-3 text-5xl">🎉</div>
-        <h2 className="text-lg font-bold">{me.name}님, 제출 완료!</h2>
-        <p className="mt-1 text-sm text-slate-500">언제든 다시 들어와 수정할 수 있어요.</p>
-        <div className="mt-6 space-y-2">
+      <div className="py-8 text-center">
+        <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-ok-light text-5xl">
+          🎉
+        </div>
+        <h2 className="text-[22px] font-extrabold text-ink">제출 완료!</h2>
+        <p className="mt-1.5 text-[15px] text-ink-600">
+          {me.name}님 응답이 저장됐어요.
+          <br />
+          언제든 다시 들어와 수정할 수 있어요.
+        </p>
+        <div className="mt-7 space-y-2.5">
           <Link
             href={`/poll/${pollId}/result`}
-            className="block w-full rounded-2xl bg-brand py-3.5 font-bold text-white"
+            className="btn-primary flex items-center justify-center"
           >
             결과 보기
           </Link>
-          <button
-            type="button"
-            onClick={() => setDone(false)}
-            className="block w-full rounded-2xl border border-slate-200 bg-white py-3.5 font-semibold text-slate-600"
-          >
+          <button type="button" onClick={() => setDone(false)} className="btn-secondary">
             내 응답 수정하기
           </button>
           <button
@@ -129,7 +134,7 @@ export default function VoteBoard({ pollId, members, dates, votes }: Props) {
               setMemberId(null)
               setPicks({})
             }}
-            className="block w-full py-2 text-sm text-slate-400"
+            className="block w-full py-2 text-sm font-medium text-ink-500"
           >
             다른 사람으로 투표하기
           </button>
@@ -141,10 +146,10 @@ export default function VoteBoard({ pollId, members, dates, votes }: Props) {
   // ── 2단계: 날짜별 O/△/X ────────────────────────────────────────────
   return (
     <div>
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-5 flex items-center justify-between">
         <div>
-          <p className="text-xs text-slate-400">투표하는 사람</p>
-          <p className="text-base font-bold">
+          <p className="text-xs font-medium text-ink-500">투표하는 사람</p>
+          <p className="text-[19px] font-extrabold text-ink">
             {me.isAnchor && '⭐ '}
             {me.name}
           </p>
@@ -152,7 +157,7 @@ export default function VoteBoard({ pollId, members, dates, votes }: Props) {
         <button
           type="button"
           onClick={() => setMemberId(null)}
-          className="rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500"
+          className="rounded-xl bg-surface-sunken px-3.5 py-2 text-[13px] font-bold text-ink-600 active:scale-95"
         >
           이름 바꾸기
         </button>
@@ -162,23 +167,23 @@ export default function VoteBoard({ pollId, members, dates, votes }: Props) {
         <button
           type="button"
           onClick={() => setAll('O')}
-          className="flex-1 rounded-lg border border-emerald-200 bg-emerald-50 py-2 text-xs font-semibold text-emerald-600"
+          className="flex-1 rounded-xl bg-ok-light py-2.5 text-[13px] font-bold text-ok-ink active:scale-[0.98]"
         >
-          전부 가능(O)
+          전부 가능 O
         </button>
         <button
           type="button"
           onClick={() => setAll('X')}
-          className="flex-1 rounded-lg border border-slate-200 bg-slate-50 py-2 text-xs font-semibold text-slate-500"
+          className="flex-1 rounded-xl bg-surface-sunken py-2.5 text-[13px] font-bold text-ink-600 active:scale-[0.98]"
         >
-          전부 불가(X)
+          전부 불가 X
         </button>
       </div>
 
       <div className="space-y-2.5">
         {dates.map((d) => (
-          <div key={d.id} className="rounded-2xl border border-slate-200 bg-white p-3">
-            <p className="mb-2 text-[15px] font-semibold">{formatKo(d.date)}</p>
+          <div key={d.id} className="card p-3.5">
+            <p className="mb-2.5 text-[16px] font-bold text-ink">{formatKo(d.date)}</p>
             <div className="grid grid-cols-3 gap-2">
               {OPTIONS.map((opt) => {
                 const active = picks[d.id] === opt.value
@@ -188,14 +193,12 @@ export default function VoteBoard({ pollId, members, dates, votes }: Props) {
                     type="button"
                     onClick={() => setPick(d.id, opt.value)}
                     className={[
-                      'flex flex-col items-center gap-0.5 rounded-xl border py-2.5 transition active:scale-95',
-                      active
-                        ? statusActiveClass(opt.value)
-                        : 'border-slate-200 bg-white text-slate-400',
+                      'flex flex-col items-center gap-0.5 rounded-xl py-2.5 transition active:scale-95',
+                      active ? statusActiveClass(opt.value) : 'bg-surface-sunken text-ink-400',
                     ].join(' ')}
                   >
-                    <span className="text-xl font-bold leading-none">{opt.label}</span>
-                    <span className="text-[11px] font-medium">{opt.desc}</span>
+                    <span className="text-[22px] font-extrabold leading-none">{opt.label}</span>
+                    <span className="text-[11px] font-bold">{opt.desc}</span>
                   </button>
                 )
               })}
@@ -208,7 +211,7 @@ export default function VoteBoard({ pollId, members, dates, votes }: Props) {
         type="button"
         onClick={submit}
         disabled={submitting || answered === 0}
-        className="sticky bottom-4 mt-4 w-full rounded-2xl bg-brand py-4 text-base font-bold text-white shadow-lg shadow-brand/25 transition active:scale-[0.99] disabled:opacity-50"
+        className="btn-primary sticky bottom-4 mt-4 shadow-float shadow-brand/25"
       >
         {submitting
           ? '제출 중…'
@@ -223,10 +226,10 @@ export default function VoteBoard({ pollId, members, dates, votes }: Props) {
 function statusActiveClass(s: VoteStatus): string {
   switch (s) {
     case 'O':
-      return 'border-emerald-500 bg-emerald-500 text-white'
+      return 'bg-ok text-white'
     case '△':
-      return 'border-amber-400 bg-amber-400 text-white'
+      return 'bg-maybe text-white'
     case 'X':
-      return 'border-slate-400 bg-slate-400 text-white'
+      return 'bg-no text-white'
   }
 }

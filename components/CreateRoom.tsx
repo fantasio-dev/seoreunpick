@@ -72,7 +72,7 @@ export default function CreateRoom() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       {/* 모임명 */}
       <Field label="모임명" required>
         <input
@@ -97,15 +97,15 @@ export default function CreateRoom() {
       <Field label="후보 날짜" required hint="달력에서 여러 날을 탭하세요">
         <Calendar value={dates} onChange={setDates} />
         {dates.length > 0 && (
-          <div className="mt-2 flex flex-wrap gap-1.5">
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
             {dates.map((d) => (
               <button
                 key={d}
                 type="button"
                 onClick={() => setDates(dates.filter((x) => x !== d))}
-                className="inline-flex items-center gap-1 rounded-full bg-brand/10 px-2.5 py-1 text-xs font-medium text-brand-700"
+                className="inline-flex items-center gap-1 rounded-full bg-brand-light px-3 py-1.5 text-[13px] font-bold text-brand"
               >
-                {formatKo(d)} <span className="text-brand-700/60">✕</span>
+                {formatKo(d)} <span className="text-brand/50">✕</span>
               </button>
             ))}
           </div>
@@ -113,7 +113,7 @@ export default function CreateRoom() {
       </Field>
 
       {/* 멤버 */}
-      <Field label="멤버" required hint="⭐ = 필수 참석자(앵커). 이 사람이 빠지면 추천에서 제외돼요">
+      <Field label="멤버" required hint="⭐ = 필수 참석자. 빠지면 추천에서 제외돼요">
         <div className="space-y-2">
           {members.map((m, i) => (
             <div key={i} className="flex items-center gap-2">
@@ -121,10 +121,8 @@ export default function CreateRoom() {
                 type="button"
                 onClick={() => updateMember(i, { isAnchor: !m.isAnchor })}
                 className={[
-                  'flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border text-lg transition',
-                  m.isAnchor
-                    ? 'border-amber-300 bg-amber-50 text-amber-500'
-                    : 'border-slate-200 bg-white text-slate-300',
+                  'flex h-[52px] w-[52px] shrink-0 items-center justify-center rounded-2xl text-lg transition active:scale-95',
+                  m.isAnchor ? 'bg-maybe-light text-maybe' : 'bg-surface-sunken text-ink-400',
                 ].join(' ')}
                 aria-label="필수 참석자 토글"
                 title="필수 참석자(앵커)로 지정"
@@ -140,7 +138,7 @@ export default function CreateRoom() {
               <button
                 type="button"
                 onClick={() => removeMember(i)}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-slate-300 hover:text-rose-400"
+                className="flex h-[52px] w-10 shrink-0 items-center justify-center rounded-2xl text-ink-400 active:scale-95"
                 aria-label="멤버 삭제"
               >
                 ✕
@@ -151,48 +149,64 @@ export default function CreateRoom() {
         <button
           type="button"
           onClick={addMember}
-          className="mt-2 w-full rounded-xl border border-dashed border-slate-300 py-2.5 text-sm font-medium text-slate-500 hover:border-brand/40 hover:text-brand"
+          className="mt-2 h-12 w-full rounded-2xl bg-surface-sunken text-sm font-bold text-ink-600 active:scale-[0.99]"
         >
           + 멤버 추가
         </button>
       </Field>
 
       {/* 정족수 */}
-      <Field label="정족수" hint={`최소 ${effectiveQuorum}명 모이면 성사로 봐요`}>
+      <Field label="정족수" hint={`${effectiveQuorum}명 이상 모이면 성사로 봐요`}>
         <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min={1}
-            max={Math.max(1, validCount)}
-            value={effectiveQuorum}
-            onChange={(e) => {
-              setQuorumTouched(true)
-              setQuorum(Number(e.target.value))
-            }}
-            className="input w-24 text-center"
-          />
-          <span className="text-sm text-slate-400">/ {validCount || 0}명</span>
+          <div className="flex h-[52px] flex-1 items-center justify-between rounded-2xl bg-surface-sunken px-2">
+            <button
+              type="button"
+              onClick={() => {
+                setQuorumTouched(true)
+                setQuorum(Math.max(1, effectiveQuorum - 1))
+              }}
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-xl font-bold text-ink-700 shadow-card active:scale-95"
+              aria-label="정족수 줄이기"
+            >
+              −
+            </button>
+            <span className="text-[17px] font-bold text-ink">
+              {effectiveQuorum}
+              <span className="ml-1 text-sm font-medium text-ink-500">/ {validCount || 0}명</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setQuorumTouched(true)
+                setQuorum(Math.min(Math.max(1, validCount), effectiveQuorum + 1))
+              }}
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-xl font-bold text-ink-700 shadow-card active:scale-95"
+              aria-label="정족수 늘리기"
+            >
+              +
+            </button>
+          </div>
           {quorumTouched && (
             <button
               type="button"
               onClick={() => setQuorumTouched(false)}
-              className="ml-auto rounded-lg bg-slate-100 px-3 py-1.5 text-xs font-medium text-slate-500"
+              className="h-[52px] shrink-0 rounded-2xl bg-surface-sunken px-3.5 text-[13px] font-bold text-ink-600 active:scale-95"
             >
-              과반({majority})으로
+              과반 {majority}
             </button>
           )}
         </div>
       </Field>
 
       {error && (
-        <p className="rounded-xl bg-rose-50 px-3 py-2.5 text-sm text-rose-600">{error}</p>
+        <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-600">{error}</p>
       )}
 
       <button
         type="button"
         onClick={handleSubmit}
         disabled={submitting}
-        className="sticky bottom-4 w-full rounded-2xl bg-brand py-4 text-base font-bold text-white shadow-lg shadow-brand/25 transition active:scale-[0.99] disabled:opacity-60"
+        className="btn-primary sticky bottom-4 shadow-float shadow-brand/25"
       >
         {submitting ? '만드는 중…' : '방 만들고 링크 받기'}
       </button>
@@ -213,10 +227,10 @@ function Field({
 }) {
   return (
     <div>
-      <div className="mb-1.5 flex items-baseline gap-1.5">
-        <span className="text-sm font-semibold text-slate-700">{label}</span>
+      <div className="mb-2 flex items-baseline gap-1.5">
+        <span className="text-[15px] font-bold text-ink">{label}</span>
         {required && <span className="text-brand">*</span>}
-        {hint && <span className="text-xs text-slate-400">{hint}</span>}
+        {hint && <span className="text-xs font-medium text-ink-500">{hint}</span>}
       </div>
       {children}
     </div>

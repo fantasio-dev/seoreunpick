@@ -33,7 +33,7 @@ export default function ConfirmButton({ pollId, pollDateId, confirmed, variant =
         type="button"
         onClick={() => act(null)}
         disabled={loading}
-        className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 disabled:opacity-50"
+        className="rounded-xl bg-white/70 px-3.5 py-2 text-[13px] font-bold text-ok-ink active:scale-95 disabled:opacity-50"
       >
         {loading ? '…' : '확정 해제'}
       </button>
@@ -46,7 +46,7 @@ export default function ConfirmButton({ pollId, pollDateId, confirmed, variant =
         type="button"
         onClick={() => act(pollDateId)}
         disabled={loading}
-        className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-bold text-white active:scale-[0.99] disabled:opacity-60"
+        className="h-[50px] w-full rounded-2xl bg-ok text-[15px] font-bold text-white active:scale-[0.99] disabled:opacity-60"
       >
         {loading ? '확정 중…' : '✅ 이 날짜로 확정하기'}
       </button>
@@ -58,7 +58,7 @@ export default function ConfirmButton({ pollId, pollDateId, confirmed, variant =
       type="button"
       onClick={() => act(pollDateId)}
       disabled={loading}
-      className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 disabled:opacity-60"
+      className="rounded-xl bg-ok-light px-3.5 py-2 text-[13px] font-bold text-ok-ink active:scale-95 disabled:opacity-60"
     >
       {loading ? '…' : '이 날로 확정'}
     </button>
