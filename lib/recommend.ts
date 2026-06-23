@@ -4,8 +4,8 @@ import type { PollBundle, VoteStatus } from './types'
 // 추천 알고리즘 (이 앱의 핵심 차별점)
 //
 // 각 후보 날짜에 대해:
-//   available = O 찍은 사람들
-//   anchorsOk = 모든 앵커가 available 에 포함? (앵커는 O만 인정, △/X/미응답이면 불충족)
+//   available = O(가능) 찍은 사람들
+//   anchorsOk = 모든 앵커가 available 에 포함? (앵커는 O만 인정, X/미응답이면 불충족)
 //   count     = available 수
 //   quorumOk  = count >= 정족수
 // 랭킹: anchorsOk=true 우선 → count 내림차순
@@ -27,7 +27,6 @@ export interface DateAnalysis {
   pollDateId: number
   date: string
   oNames: string[]
-  maybeNames: string[]
   xNames: string[]
   noneNames: string[] // 이 날짜에 응답 안 한 사람
   count: number // O 수
@@ -74,14 +73,12 @@ export function analyze(bundle: PollBundle): Recommendation {
 
   const analyses: DateAnalysis[] = dates.map((d) => {
     const oNames: string[] = []
-    const maybeNames: string[] = []
     const xNames: string[] = []
     const noneNames: string[] = []
 
     for (const m of members) {
       const status = voteMap.get(m.id)?.get(d.id)
       if (status === 'O') oNames.push(m.name)
-      else if (status === '△') maybeNames.push(m.name)
       else if (status === 'X') xNames.push(m.name)
       else noneNames.push(m.name)
     }
@@ -115,8 +112,8 @@ export function analyze(bundle: PollBundle): Recommendation {
 
     // 보너스: 미응답자가 전원 O 했을 때를 가정
     const potentialCount = count + noneNames.length
-    // 앵커가 △/X 로 막혀 있으면(미응답이 아니면) 전원 O 가정으로도 못 살림
-    const anchorBlocked = anchorIssues.some((a) => a.status === '△' || a.status === 'X')
+    // 앵커가 X 로 막혀 있으면(미응답이 아니면) 전원 O 가정으로도 못 살림
+    const anchorBlocked = anchorIssues.some((a) => a.status === 'X')
     const canBecomeGreen =
       tier !== 'green' && !anchorBlocked && potentialCount >= quorum && noneNames.length > 0
 
@@ -124,7 +121,6 @@ export function analyze(bundle: PollBundle): Recommendation {
       pollDateId: d.id,
       date: d.date,
       oNames,
-      maybeNames,
       xNames,
       noneNames,
       count,

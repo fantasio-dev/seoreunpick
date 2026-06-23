@@ -1,6 +1,6 @@
 // 도메인 타입. DB 행(snake_case)은 lib/db.ts 안에서 camelCase 로 매핑해 내보낸다.
 
-export type VoteStatus = 'O' | '△' | 'X'
+export type VoteStatus = 'O' | 'X'
 
 export type PollStatus = 'open' | 'confirmed'
 

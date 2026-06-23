@@ -15,7 +15,6 @@ interface Props {
 
 const OPTIONS: { value: VoteStatus; label: string; desc: string }[] = [
   { value: 'O', label: 'O', desc: '가능' },
-  { value: '△', label: '△', desc: '애매' },
   { value: 'X', label: 'X', desc: '불가' },
 ]
 
@@ -184,7 +183,7 @@ export default function VoteBoard({ pollId, members, dates, votes }: Props) {
         {dates.map((d) => (
           <div key={d.id} className="card p-3.5">
             <p className="mb-2.5 text-[16px] font-bold text-ink">{formatKo(d.date)}</p>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               {OPTIONS.map((opt) => {
                 const active = picks[d.id] === opt.value
                 return (
@@ -227,8 +226,6 @@ function statusActiveClass(s: VoteStatus): string {
   switch (s) {
     case 'O':
       return 'bg-ok text-white'
-    case '△':
-      return 'bg-maybe text-white'
     case 'X':
       return 'bg-no text-white'
   }

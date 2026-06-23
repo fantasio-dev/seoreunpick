@@ -23,9 +23,8 @@ export default function VotePage({ params }: { params: { id: string } }) {
         </p>
       </header>
 
-      <div className="mb-6 flex items-center justify-center gap-4 rounded-2xl bg-surface-sunken px-3 py-2.5 text-[13px] font-bold text-ink-700">
+      <div className="mb-6 flex items-center justify-center gap-5 rounded-2xl bg-surface-sunken px-3 py-2.5 text-[13px] font-bold text-ink-700">
         <Legend swatch="bg-ok" label="O 가능" />
-        <Legend swatch="bg-maybe" label="△ 애매" />
         <Legend swatch="bg-no" label="X 불가" />
       </div>
 

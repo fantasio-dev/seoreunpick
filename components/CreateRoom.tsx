@@ -14,7 +14,6 @@ interface MemberInput {
 export default function CreateRoom() {
   const router = useRouter()
   const [title, setTitle] = useState('')
-  const [hostName, setHostName] = useState('')
   const [dates, setDates] = useState<string[]>([])
   const [members, setMembers] = useState<MemberInput[]>([
     { name: '', isAnchor: false },
@@ -23,6 +22,7 @@ export default function CreateRoom() {
   ])
   const [quorum, setQuorum] = useState<number>(2)
   const [quorumTouched, setQuorumTouched] = useState(false)
+  const [showQuorum, setShowQuorum] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -59,7 +59,7 @@ export default function CreateRoom() {
     try {
       const { id } = await createPollAction({
         title: title.trim(),
-        hostName: hostName.trim(),
+        hostName: '', // 방장 = 첫 번째 멤버 (서버에서 기본값 처리)
         quorum: effectiveQuorum,
         dates,
         members: cleanMembers,
@@ -79,16 +79,6 @@ export default function CreateRoom() {
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="예) 서른개 7월 정모"
-          className="input"
-        />
-      </Field>
-
-      {/* 방장 이름 */}
-      <Field label="방장 이름" hint="비워두면 첫 번째 멤버가 방장이 돼요">
-        <input
-          value={hostName}
-          onChange={(e) => setHostName(e.target.value)}
-          placeholder="예) 최태석"
           className="input"
         />
       </Field>
@@ -155,48 +145,62 @@ export default function CreateRoom() {
         </button>
       </Field>
 
-      {/* 정족수 */}
-      <Field label="정족수" hint={`${effectiveQuorum}명 이상 모이면 성사로 봐요`}>
-        <div className="flex items-center gap-2">
-          <div className="flex h-[52px] flex-1 items-center justify-between rounded-2xl bg-surface-sunken px-2">
+      {/* 정족수 — 기본은 과반 자동, 필요할 때만 펼쳐서 조절 */}
+      {!showQuorum ? (
+        <button
+          type="button"
+          onClick={() => setShowQuorum(true)}
+          className="flex w-full items-center justify-between rounded-2xl bg-surface-sunken px-4 py-3.5 text-left active:scale-[0.99]"
+        >
+          <span className="text-[15px] font-bold text-ink">
+            정족수 <span className="text-ink-500">과반 {effectiveQuorum}명 자동</span>
+          </span>
+          <span className="text-[13px] font-bold text-brand">바꾸기</span>
+        </button>
+      ) : (
+        <Field label="정족수" hint={`${effectiveQuorum}명 이상 모이면 성사로 봐요`}>
+          <div className="flex items-center gap-2">
+            <div className="flex h-[52px] flex-1 items-center justify-between rounded-2xl bg-surface-sunken px-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setQuorumTouched(true)
+                  setQuorum(Math.max(1, effectiveQuorum - 1))
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-xl font-bold text-ink-700 shadow-card active:scale-95"
+                aria-label="정족수 줄이기"
+              >
+                −
+              </button>
+              <span className="text-[17px] font-bold text-ink">
+                {effectiveQuorum}
+                <span className="ml-1 text-sm font-medium text-ink-500">/ {validCount || 0}명</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setQuorumTouched(true)
+                  setQuorum(Math.min(Math.max(1, validCount), effectiveQuorum + 1))
+                }}
+                className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-xl font-bold text-ink-700 shadow-card active:scale-95"
+                aria-label="정족수 늘리기"
+              >
+                +
+              </button>
+            </div>
             <button
               type="button"
               onClick={() => {
-                setQuorumTouched(true)
-                setQuorum(Math.max(1, effectiveQuorum - 1))
+                setQuorumTouched(false)
+                setShowQuorum(false)
               }}
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-xl font-bold text-ink-700 shadow-card active:scale-95"
-              aria-label="정족수 줄이기"
-            >
-              −
-            </button>
-            <span className="text-[17px] font-bold text-ink">
-              {effectiveQuorum}
-              <span className="ml-1 text-sm font-medium text-ink-500">/ {validCount || 0}명</span>
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                setQuorumTouched(true)
-                setQuorum(Math.min(Math.max(1, validCount), effectiveQuorum + 1))
-              }}
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-xl font-bold text-ink-700 shadow-card active:scale-95"
-              aria-label="정족수 늘리기"
-            >
-              +
-            </button>
-          </div>
-          {quorumTouched && (
-            <button
-              type="button"
-              onClick={() => setQuorumTouched(false)}
               className="h-[52px] shrink-0 rounded-2xl bg-surface-sunken px-3.5 text-[13px] font-bold text-ink-600 active:scale-95"
             >
-              과반 {majority}
+              과반 자동
             </button>
-          )}
-        </div>
-      </Field>
+          </div>
+        </Field>
+      )}
 
       {error && (
         <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-600">{error}</p>
