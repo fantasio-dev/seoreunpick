@@ -3,8 +3,8 @@ import { buildIcs } from '@/lib/ics'
 
 export const dynamic = 'force-dynamic'
 
-export function GET(req: Request, { params }: { params: { id: string } }) {
-  const bundle = getPollBundle(params.id)
+export async function GET(req: Request, { params }: { params: { id: string } }) {
+  const bundle = await getPollBundle(params.id)
   if (!bundle) return new Response('Not found', { status: 404 })
 
   const url = new URL(req.url)

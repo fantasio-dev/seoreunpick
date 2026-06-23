@@ -5,8 +5,8 @@ import { getPollBundle } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-export default function VotePage({ params }: { params: { id: string } }) {
-  const bundle = getPollBundle(params.id)
+export default async function VotePage({ params }: { params: { id: string } }) {
+  const bundle = await getPollBundle(params.id)
   if (!bundle) notFound()
 
   const { poll, dates, members, votes } = bundle

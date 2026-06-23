@@ -10,14 +10,14 @@ export const dynamic = 'force-dynamic'
 
 const TIER_DOT = { green: '🟢', yellow: '🟡', gray: '⚪' } as const
 
-export default function ResultPage({
+export default async function ResultPage({
   params,
   searchParams,
 }: {
   params: { id: string }
   searchParams: { created?: string }
 }) {
-  const bundle = getPollBundle(params.id)
+  const bundle = await getPollBundle(params.id)
   if (!bundle) notFound()
 
   const { poll, dates, members } = bundle

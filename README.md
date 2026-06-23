@@ -62,10 +62,10 @@ app/
   actions.ts                   서버 액션(방 생성/투표/확정)
 components/                     Calendar, CreateRoom, VoteBoard, ShareBar, ConfirmButton
 lib/
-  db.ts                        ★ 모든 DB 접근 (better-sqlite3) — 교체는 여기만
+  db.ts                        ★ 모든 DB 접근 (@libsql/client) — 교체는 여기만
   recommend.ts                 추천 알고리즘
   types.ts / date.ts / ics.ts / id.ts
-data/seoreunpick.db            SQLite 파일 (gitignore)
+data/seoreunpick.db            로컬 SQLite 파일 (gitignore)
 ```
 
 ## 데이터 모델
@@ -74,42 +74,38 @@ data/seoreunpick.db            SQLite 파일 (gitignore)
 poll(id, title, host_name, quorum, status, confirmed_poll_date_id, created_at)
 poll_date(id, poll_id, date)
 member(id, poll_id, name, is_anchor)
-vote(id, poll_id, member_id, poll_date_id, status['O'|'△'|'X'], updated_at)
+vote(id, poll_id, member_id, poll_date_id, status['O'|'X'], updated_at)
 ```
 
 > 날짜 확정 상태를 담기 위해 사양의 `poll` 에 `confirmed_poll_date_id` 컬럼 하나를 추가했습니다.
 
-## 배포 (영속 디스크)
+## DB — 로컬 파일 / 운영 Turso (코드 동일)
 
-SQLite 파일(`data/`)을 유지하려면 **영속 디스크가 붙는** 호스팅을 쓰세요.
+DB는 [`@libsql/client`](https://github.com/tursodatabase/libsql-client-ts) 하나로 두 모드를 같은 코드로 씁니다.
 
-**Railway / Render / Fly.io 공통**
+- **로컬**: 환경변수 없음 → `data/seoreunpick.db` 파일에 저장. `npm run dev` 하면 끝.
+- **운영**: `TURSO_DATABASE_URL`(+ `TURSO_AUTH_TOKEN`) 가 있으면 자동으로 [Turso](https://turso.tech)(libSQL, SQLite 호환)에 연결.
 
-1. 빌드: `npm install && npm run build`
-2. 실행: `npm run start` (기본 포트 3000, 환경변수 `PORT` 자동 인식)
-3. **영속 볼륨을 `/app/data` (= 프로젝트의 `data/`)에 마운트** — 이게 없으면 재배포 때 투표가 사라집니다.
-4. (선택) DB 경로를 바꾸려면 환경변수 `SEOREUNPICK_DB=/data/seoreunpick.db` 지정 후, 볼륨을 `/data` 에 마운트.
-
-- **Fly.io**: `fly volumes create data --size 1` 후 `fly.toml` 의 `[mounts]` 에 `source="data"`, `destination="/data"`. 환경변수 `SEOREUNPICK_DB=/data/seoreunpick.db`.
-- **Render**: Disk 추가(Mount Path `/data`) + 환경변수 `SEOREUNPICK_DB=/data/seoreunpick.db`.
-- **Railway**: Volume 추가(Mount `/data`) + 동일 환경변수.
-
-재시드가 필요하면:
+전환은 환경변수만 주면 되고, 코드 변경은 없습니다. 모든 접근은 [`lib/db.ts`](lib/db.ts) 한 파일에 모여 있습니다.
 
 ```bash
-npm run seed   # data/ 의 DB 파일 삭제 → 다음 실행 시 demo 방 재생성
+npm run seed   # 로컬 data/ DB 삭제 → 다음 실행 시 demo 방 재시드
 ```
 
-## Vercel 등 서버리스에 올리려면 (SQLite → Turso)
+## 배포 (Vercel + Turso, 무료)
 
-Vercel/서버리스는 **로컬 디스크가 사라지므로** `better-sqlite3` 파일 DB가 맞지 않습니다.
-[Turso](https://turso.tech)(libSQL, SQLite 호환)로 한 줄 교체하세요.
+서버리스(Vercel)는 로컬 디스크가 없으므로 DB는 Turso를 씁니다.
 
-1. `npm i @libsql/client` 후 Turso DB 생성 → `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN` 설정
-2. **교체는 `lib/db.ts` 한 파일만** — `better-sqlite3` 의 동기 `prepare/run/get/all` 호출을 `@libsql/client` 의 비동기 `execute` 로 바꾸고, 호출부(서버 액션/서버 컴포넌트)에 `await` 를 추가하면 됩니다. 스키마(`SCHEMA`)와 도메인 함수 시그니처는 그대로 유지됩니다.
+1. **Turso DB 생성** ([app.turso.tech](https://app.turso.tech) 또는 `turso db create seoreunpick`)
+   → `Database URL`(`libsql://...`)과 `Auth Token` 확보.
+2. **GitHub 에 push** 후 Vercel 에서 그 레포를 Import.
+3. Vercel 프로젝트 **Environment Variables** 에 추가:
+   - `TURSO_DATABASE_URL = libsql://<your-db>.turso.io`
+   - `TURSO_AUTH_TOKEN = <token>`
+4. Deploy. 첫 접속 시 스키마 생성 + demo 방 시드가 자동 실행됩니다.
 
-> 모든 DB 접근이 `lib/db.ts` 에 모여 있어 교체 범위가 이 파일로 한정됩니다.
+> 영속 디스크가 붙는 곳(Railway/Fly.io)에 올리려면 환경변수 없이 그대로 두고 볼륨을 `data/` 에 마운트해도 됩니다(파일 모드).
 
 ## 기술 스택
 
-Next.js 14 (App Router), TypeScript, Tailwind CSS, better-sqlite3, 모바일 우선(360–430px)
+Next.js 14 (App Router), TypeScript, Tailwind CSS, libSQL(@libsql/client), 모바일 우선(360–430px)

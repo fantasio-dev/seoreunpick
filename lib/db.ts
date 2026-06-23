@@ -1,4 +1,4 @@
-import Database from 'better-sqlite3'
+import { createClient, type Client, type InStatement } from '@libsql/client'
 import fs from 'node:fs'
 import path from 'node:path'
 import { newId } from './id'
@@ -6,20 +6,21 @@ import type {
   CreatePollInput,
   MemberRow,
   PollBundle,
-  PollDateRow,
   PollMeta,
   PollStatus,
   VoteEntry,
   VoteRow,
+  VoteStatus,
 } from './types'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 데이터 접근은 전부 이 파일에 모은다. 다른 DB(Turso/Postgres 등)로 바꿀 때
-// 여기 함수 본문만 갈아끼우면 되도록, 바깥에는 도메인 타입만 노출한다.
+// 데이터 접근은 전부 이 파일에 모은다. libSQL(@libsql/client) 하나로
+//   - 로컬:  file: 경로 (data/seoreunpick.db)
+//   - 운영:  Turso (TURSO_DATABASE_URL / TURSO_AUTH_TOKEN)
+// 둘 다 같은 코드로 동작. 다른 DB로 바꿀 때도 이 파일만 손대면 된다.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DB_DIR = path.join(process.cwd(), 'data')
-const DB_PATH = process.env.SEOREUNPICK_DB ?? path.join(DB_DIR, 'seoreunpick.db')
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS poll (
@@ -60,122 +61,158 @@ CREATE INDEX IF NOT EXISTS idx_member_poll ON member(poll_id);
 CREATE INDEX IF NOT EXISTS idx_vote_poll ON vote(poll_id);
 `
 
-function init(): Database.Database {
+function makeClient(): Client {
+  const url = process.env.TURSO_DATABASE_URL
+  if (url) {
+    return createClient({ url, authToken: process.env.TURSO_AUTH_TOKEN })
+  }
+  // 로컬 파일 모드
   fs.mkdirSync(DB_DIR, { recursive: true })
-  const db = new Database(DB_PATH)
-  db.pragma('journal_mode = WAL')
-  db.pragma('foreign_keys = ON')
-  db.exec(SCHEMA)
-  seedIfEmpty(db)
-  return db
+  return createClient({ url: 'file:' + path.join(DB_DIR, 'seoreunpick.db') })
 }
 
-// dev 핫리로드 때마다 새 커넥션이 열리는 걸 막으려고 globalThis 에 캐시한다.
-const globalForDb = globalThis as unknown as { __seoreunpickDb?: Database.Database }
-const db: Database.Database = globalForDb.__seoreunpickDb ?? (globalForDb.__seoreunpickDb = init())
+// dev 핫리로드/서버리스 콜드스타트마다 중복 init 되지 않게 globalThis 에 캐시한다.
+const g = globalThis as unknown as {
+  __seoreunpickClient?: Client
+  __seoreunpickReady?: Promise<void>
+}
+const client: Client = g.__seoreunpickClient ?? (g.__seoreunpickClient = makeClient())
+
+/** 스키마 생성 + (비어 있으면) 시드를 프로세스당 한 번만 보장. */
+function ready(): Promise<void> {
+  if (!g.__seoreunpickReady) g.__seoreunpickReady = init()
+  return g.__seoreunpickReady
+}
+async function init(): Promise<void> {
+  await client.executeMultiple(SCHEMA)
+  await seedIfEmpty()
+}
 
 // ── 매핑 헬퍼 (snake_case 행 → 도메인 타입) ──────────────────────────────────
 
-function mapPoll(row: any): PollMeta {
+type Row = Record<string, unknown>
+
+function mapPoll(row: Row): PollMeta {
   return {
-    id: row.id,
-    title: row.title,
-    hostName: row.host_name,
-    quorum: row.quorum,
-    status: row.status as PollStatus,
-    confirmedPollDateId: row.confirmed_poll_date_id ?? null,
-    createdAt: row.created_at,
+    id: String(row.id),
+    title: String(row.title),
+    hostName: String(row.host_name),
+    quorum: Number(row.quorum),
+    status: String(row.status) as PollStatus,
+    confirmedPollDateId: row.confirmed_poll_date_id == null ? null : Number(row.confirmed_poll_date_id),
+    createdAt: String(row.created_at),
   }
 }
 
 // ── 쓰기 ─────────────────────────────────────────────────────────────────────
 
-export function createPoll(input: CreatePollInput): string {
+export async function createPoll(input: CreatePollInput): Promise<string> {
+  await ready()
   const id = input.id ?? newId()
-  const insertPoll = db.prepare(
-    `INSERT INTO poll (id, title, host_name, quorum, status) VALUES (?, ?, ?, ?, 'open')`,
-  )
-  const insertDate = db.prepare(`INSERT INTO poll_date (poll_id, date) VALUES (?, ?)`)
-  const insertMember = db.prepare(`INSERT INTO member (poll_id, name, is_anchor) VALUES (?, ?, ?)`)
-
-  const tx = db.transaction(() => {
-    insertPoll.run(id, input.title, input.hostName, input.quorum)
-    for (const d of input.dates) insertDate.run(id, d)
-    for (const m of input.members) insertMember.run(id, m.name, m.isAnchor ? 1 : 0)
-  })
-  tx()
+  const stmts: InStatement[] = [
+    {
+      sql: `INSERT INTO poll (id, title, host_name, quorum, status) VALUES (?, ?, ?, ?, 'open')`,
+      args: [id, input.title, input.hostName, input.quorum],
+    },
+    ...input.dates.map((d) => ({
+      sql: `INSERT INTO poll_date (poll_id, date) VALUES (?, ?)`,
+      args: [id, d],
+    })),
+    ...input.members.map((m) => ({
+      sql: `INSERT INTO member (poll_id, name, is_anchor) VALUES (?, ?, ?)`,
+      args: [id, m.name, m.isAnchor ? 1 : 0],
+    })),
+  ]
+  await client.batch(stmts, 'write')
   return id
 }
 
 /** 한 멤버의 날짜별 응답을 일괄 upsert. 기존 응답은 덮어쓴다. */
-export function upsertVotes(pollId: string, memberId: number, entries: VoteEntry[]): void {
-  const stmt = db.prepare(
-    `INSERT INTO vote (poll_id, member_id, poll_date_id, status, updated_at)
-     VALUES (?, ?, ?, ?, datetime('now'))
-     ON CONFLICT(member_id, poll_date_id)
-     DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at`,
-  )
-  const tx = db.transaction(() => {
-    for (const e of entries) stmt.run(pollId, memberId, e.pollDateId, e.status)
-  })
-  tx()
+export async function upsertVotes(
+  pollId: string,
+  memberId: number,
+  entries: VoteEntry[],
+): Promise<void> {
+  await ready()
+  if (entries.length === 0) return
+  const stmts: InStatement[] = entries.map((e) => ({
+    sql: `INSERT INTO vote (poll_id, member_id, poll_date_id, status, updated_at)
+          VALUES (?, ?, ?, ?, datetime('now'))
+          ON CONFLICT(member_id, poll_date_id)
+          DO UPDATE SET status = excluded.status, updated_at = excluded.updated_at`,
+    args: [pollId, memberId, e.pollDateId, e.status],
+  }))
+  await client.batch(stmts, 'write')
 }
 
 /** 날짜 확정 / 확정 해제(null). */
-export function setConfirmedDate(pollId: string, pollDateId: number | null): void {
-  db.prepare(`UPDATE poll SET status = ?, confirmed_poll_date_id = ? WHERE id = ?`).run(
-    pollDateId === null ? 'open' : 'confirmed',
-    pollDateId,
-    pollId,
-  )
+export async function setConfirmedDate(pollId: string, pollDateId: number | null): Promise<void> {
+  await ready()
+  await client.execute({
+    sql: `UPDATE poll SET status = ?, confirmed_poll_date_id = ? WHERE id = ?`,
+    args: [pollDateId === null ? 'open' : 'confirmed', pollDateId, pollId],
+  })
 }
 
 // ── 읽기 ─────────────────────────────────────────────────────────────────────
 
-export function getPollBundle(pollId: string): PollBundle | null {
-  const pollRow = db.prepare(`SELECT * FROM poll WHERE id = ?`).get(pollId)
-  if (!pollRow) return null
+export async function getPollBundle(pollId: string): Promise<PollBundle | null> {
+  await ready()
+  const pollRes = await client.execute({ sql: `SELECT * FROM poll WHERE id = ?`, args: [pollId] })
+  if (pollRes.rows.length === 0) return null
 
-  const dates = db
-    .prepare(`SELECT id, date FROM poll_date WHERE poll_id = ? ORDER BY date ASC, id ASC`)
-    .all(pollId) as PollDateRow[]
+  const datesRes = await client.execute({
+    sql: `SELECT id, date FROM poll_date WHERE poll_id = ? ORDER BY date ASC, id ASC`,
+    args: [pollId],
+  })
+  const membersRes = await client.execute({
+    sql: `SELECT id, name, is_anchor FROM member WHERE poll_id = ? ORDER BY id ASC`,
+    args: [pollId],
+  })
+  const votesRes = await client.execute({
+    sql: `SELECT member_id, poll_date_id, status FROM vote WHERE poll_id = ?`,
+    args: [pollId],
+  })
 
-  const memberRows = db
-    .prepare(`SELECT id, name, is_anchor FROM member WHERE poll_id = ? ORDER BY id ASC`)
-    .all(pollId) as { id: number; name: string; is_anchor: number }[]
-  const members: MemberRow[] = memberRows.map((m) => ({
-    id: m.id,
-    name: m.name,
-    isAnchor: !!m.is_anchor,
+  const members: MemberRow[] = membersRes.rows.map((r) => ({
+    id: Number(r.id),
+    name: String(r.name),
+    isAnchor: Number(r.is_anchor) === 1,
+  }))
+  const votes: VoteRow[] = votesRes.rows.map((r) => ({
+    memberId: Number(r.member_id),
+    pollDateId: Number(r.poll_date_id),
+    status: String(r.status) as VoteStatus,
   }))
 
-  const voteRows = db
-    .prepare(`SELECT member_id, poll_date_id, status FROM vote WHERE poll_id = ?`)
-    .all(pollId) as { member_id: number; poll_date_id: number; status: string }[]
-  const votes: VoteRow[] = voteRows.map((v) => ({
-    memberId: v.member_id,
-    pollDateId: v.poll_date_id,
-    status: v.status as VoteRow['status'],
-  }))
-
-  return { poll: mapPoll(pollRow), dates, members, votes }
+  return {
+    poll: mapPoll(pollRes.rows[0] as Row),
+    dates: datesRes.rows.map((r) => ({ id: Number(r.id), date: String(r.date) })),
+    members,
+    votes,
+  }
 }
 
 // ── 시드 ─────────────────────────────────────────────────────────────────────
 
-function seedIfEmpty(handle: Database.Database): void {
-  const count = (handle.prepare(`SELECT COUNT(*) AS c FROM poll`).get() as { c: number }).c
-  if (count > 0) return
-
+async function seedIfEmpty(): Promise<void> {
   const SEED_ID = 'demo'
-  handle
-    .prepare(`INSERT INTO poll (id, title, host_name, quorum, status) VALUES (?, ?, ?, ?, 'open')`)
-    .run(SEED_ID, '서른개 7월 정모 (윤이사님 승진 축하)', '최태석', 5)
+  // 데모 방을 OR IGNORE 로 선점 — 이미 있으면 rowsAffected=0 이라 race-safe
+  const claim = await client.execute({
+    sql: `INSERT OR IGNORE INTO poll (id, title, host_name, quorum, status) VALUES (?, ?, ?, ?, 'open')`,
+    args: [SEED_ID, '서른개 7월 정모 (윤이사님 승진 축하)', '최태석', 5],
+  })
+  if (claim.rowsAffected === 0) return // 이미 시드됨
 
   const dateList = ['2026-07-07', '2026-07-08', '2026-07-09', '2026-07-10']
-  const insDate = handle.prepare(`INSERT INTO poll_date (poll_id, date) VALUES (?, ?)`)
   const dateId: Record<string, number> = {}
-  for (const d of dateList) dateId[d] = Number(insDate.run(SEED_ID, d).lastInsertRowid)
+  for (const d of dateList) {
+    const r = await client.execute({
+      sql: `INSERT INTO poll_date (poll_id, date) VALUES (?, ?)`,
+      args: [SEED_ID, d],
+    })
+    dateId[d] = Number(r.lastInsertRowid)
+  }
 
   // 앵커(필수 참석): 이승현, 윤희욱
   const memberList: { name: string; anchor: boolean }[] = [
@@ -189,10 +226,13 @@ function seedIfEmpty(handle: Database.Database): void {
     { name: '김선우', anchor: false },
     { name: '김민석', anchor: false },
   ]
-  const insMember = handle.prepare(`INSERT INTO member (poll_id, name, is_anchor) VALUES (?, ?, ?)`)
   const memberId: Record<string, number> = {}
   for (const m of memberList) {
-    memberId[m.name] = Number(insMember.run(SEED_ID, m.name, m.anchor ? 1 : 0).lastInsertRowid)
+    const r = await client.execute({
+      sql: `INSERT INTO member (poll_id, name, is_anchor) VALUES (?, ?, ?)`,
+      args: [SEED_ID, m.name, m.anchor ? 1 : 0],
+    })
+    memberId[m.name] = Number(r.lastInsertRowid)
   }
 
   // 알고리즘이 한눈에 보이도록 샘플 응답 주입 (O/X 2단계).
@@ -201,7 +241,7 @@ function seedIfEmpty(handle: Database.Database): void {
   //  07-09 → 🟡 조건부 (앵커 OK지만 정족수 -1, 미응답 전원 O면 도달 가능)
   //  07-10 → ⚪ 탈락
   //  라윤철, 김선우 → 전혀 응답 안 함(미응답)
-  const v: Record<string, Record<string, 'O' | 'X'>> = {
+  const v: Record<string, Record<string, VoteStatus>> = {
     최태석: { '2026-07-07': 'O', '2026-07-08': 'O', '2026-07-09': 'X', '2026-07-10': 'X' },
     김정욱: { '2026-07-07': 'O', '2026-07-08': 'O', '2026-07-09': 'O', '2026-07-10': 'X' },
     이승현: { '2026-07-07': 'X', '2026-07-08': 'O', '2026-07-09': 'O', '2026-07-10': 'X' },
@@ -210,14 +250,16 @@ function seedIfEmpty(handle: Database.Database): void {
     윤희욱: { '2026-07-07': 'O', '2026-07-08': 'O', '2026-07-09': 'O', '2026-07-10': 'X' },
     김민석: { '2026-07-07': 'X', '2026-07-08': 'O', '2026-07-09': 'O', '2026-07-10': 'O' },
   }
-  const insVote = handle.prepare(
-    `INSERT INTO vote (poll_id, member_id, poll_date_id, status) VALUES (?, ?, ?, ?)`,
-  )
+  const voteStmts: InStatement[] = []
   for (const [name, perDate] of Object.entries(v)) {
     for (const [d, status] of Object.entries(perDate)) {
-      insVote.run(SEED_ID, memberId[name], dateId[d], status)
+      voteStmts.push({
+        sql: `INSERT INTO vote (poll_id, member_id, poll_date_id, status) VALUES (?, ?, ?, ?)`,
+        args: [SEED_ID, memberId[name], dateId[d], status],
+      })
     }
   }
+  await client.batch(voteStmts, 'write')
 }
 
 /** 시드 방 id (README/홈에서 링크 노출용). */

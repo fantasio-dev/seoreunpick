@@ -23,7 +23,7 @@ export async function createPollAction(input: CreatePollInput): Promise<{ id: st
   const quorum = Math.min(Math.max(1, Math.round(input.quorum)), members.length)
   const hostName = input.hostName.trim() || members[0].name
 
-  const id = createPoll({ title, hostName, quorum, dates, members })
+  const id = await createPoll({ title, hostName, quorum, dates, members })
   return { id }
 }
 
@@ -33,7 +33,7 @@ export async function submitVoteAction(
   memberId: number,
   entries: VoteEntry[],
 ): Promise<{ ok: true }> {
-  upsertVotes(pollId, memberId, entries)
+  await upsertVotes(pollId, memberId, entries)
   revalidatePath(`/poll/${pollId}`)
   revalidatePath(`/poll/${pollId}/result`)
   return { ok: true }
@@ -44,7 +44,7 @@ export async function confirmDateAction(
   pollId: string,
   pollDateId: number | null,
 ): Promise<{ ok: true }> {
-  setConfirmedDate(pollId, pollDateId)
+  await setConfirmedDate(pollId, pollDateId)
   revalidatePath(`/poll/${pollId}`)
   revalidatePath(`/poll/${pollId}/result`)
   return { ok: true }
