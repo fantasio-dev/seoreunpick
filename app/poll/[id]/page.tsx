@@ -1,9 +1,20 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import VoteBoard from '@/components/VoteBoard'
 import { getPollBundle } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const bundle = await getPollBundle(params.id)
+  if (!bundle) return { title: '서른픽' }
+  return {
+    title: `${bundle.poll.title} — 투표하기`,
+    description: '날짜별로 O/X 찍고 제출하기 · 서른픽',
+    openGraph: { title: bundle.poll.title, description: '날짜 투표하기 · 서른픽' },
+  }
+}
 
 export default async function VotePage({ params }: { params: { id: string } }) {
   const bundle = await getPollBundle(params.id)

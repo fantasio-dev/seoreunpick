@@ -1,10 +1,21 @@
 import type { Metadata, Viewport } from 'next'
 import './globals.css'
 
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://seoreunpick.vercel.app'
+
 export const metadata: Metadata = {
+  metadataBase: new URL(SITE_URL),
   title: '서른픽 — 모임 날짜 한 번에 정하기',
   description:
     '카톡 투표의 한계를 넘는 모임 일정 투표. 미응답자 추적, 필수 참석자 조건, 과반 자동 판단까지.',
+  openGraph: {
+    title: '서른픽 — 모임 날짜 한 번에 정하기',
+    description: '누가 되는지, 꼭 와야 할 사람은 되는지, 과반은 넘었는지 자동으로.',
+    siteName: '서른픽',
+    locale: 'ko_KR',
+    type: 'website',
+  },
+  twitter: { card: 'summary_large_image' },
 }
 
 export const viewport: Viewport = {

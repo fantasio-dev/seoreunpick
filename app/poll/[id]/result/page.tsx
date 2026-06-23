@@ -1,12 +1,24 @@
+import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import ConfirmButton from '@/components/ConfirmButton'
+import CopyLine from '@/components/CopyLine'
 import ShareBar from '@/components/ShareBar'
 import { getPollBundle } from '@/lib/db'
 import { formatKo } from '@/lib/date'
 import { analyze, type DateAnalysis } from '@/lib/recommend'
 
 export const dynamic = 'force-dynamic'
+
+export async function generateMetadata({ params }: { params: { id: string } }): Promise<Metadata> {
+  const bundle = await getPollBundle(params.id)
+  if (!bundle) return { title: '서른픽' }
+  return {
+    title: `${bundle.poll.title} — 서른픽`,
+    description: '모임 날짜 투표 결과 보기',
+    openGraph: { title: bundle.poll.title, description: '모임 날짜 투표 · 서른픽' },
+  }
+}
 
 const TIER_DOT = { green: '🟢', yellow: '🟡', gray: '⚪' } as const
 
@@ -55,7 +67,8 @@ export default async function ResultPage({
           <p className="mt-1.5 text-[30px] font-extrabold leading-tight text-ink">
             {formatKo(confirmedDate.date)}
           </p>
-          <div className="mt-4 flex items-center gap-2">
+          <p className="mt-1 text-sm font-medium text-ink-700">이제 카톡에 알리고 캘린더에 저장하세요</p>
+          <div className="mt-3 flex items-center gap-2">
             <a
               href={`/api/poll/${poll.id}/ics?dateId=${confirmedDate.id}`}
               className="rounded-xl bg-ok px-4 py-2.5 text-sm font-bold text-white active:scale-95"
@@ -64,9 +77,17 @@ export default async function ResultPage({
             </a>
             <ConfirmButton pollId={poll.id} pollDateId={confirmedDate.id} confirmed />
           </div>
+          <div className="mt-3">
+            <CopyLine
+              pollId={poll.id}
+              linkTo="result"
+              tone="ok"
+              message={`📅 "${poll.title}"\n${formatKo(confirmedDate.date)}로 정했어요! 다들 캘린더 비워두기 🙆`}
+            />
+          </div>
         </div>
       ) : (
-        <Hero rec={rec} anchorNames={anchorNames} pollId={poll.id} />
+        <Hero rec={rec} anchorNames={anchorNames} pollId={poll.id} title={poll.title} />
       )}
 
       {/* 안 한 사람 */}
@@ -121,15 +142,22 @@ function Hero({
   rec,
   anchorNames,
   pollId,
+  title,
 }: {
   rec: ReturnType<typeof analyze>
   anchorNames: string[]
   pollId: string
+  title: string
 }) {
+  const noResp = rec.noResponseMembers
+
   if (rec.best) {
     const a = rec.best
     const anchorLine =
       anchorNames.length > 0 ? `, 필수 참석 ${anchorNames.map((n) => `⭐${n}`).join(' ')} 가능` : ''
+    const msg = `🗓️ "${title}" 날짜 투표!\n지금 ${formatKo(a.date)}이 베스트 (${a.count}명 가능).${
+      noResp.length ? ` ${noResp.join(', ')}만 찍으면 끝!` : ' 거의 다 됐어요!'
+    }`
     return (
       <div className="mb-5 rounded-2xl bg-ok-light p-5">
         <p className="text-[13px] font-bold text-ok-ink">🟢 이 날이 제일 좋아요</p>
@@ -140,12 +168,18 @@ function Hero({
         <div className="mt-4">
           <ConfirmButton pollId={pollId} pollDateId={a.pollDateId} confirmed={false} variant="primary" />
         </div>
+        <div className="mt-3">
+          <CopyLine pollId={pollId} linkTo="vote" tone="ok" message={msg} />
+        </div>
       </div>
     )
   }
 
   if (rec.bestFallback) {
     const a = rec.bestFallback
+    const msg = `🗓️ "${title}" 날짜 투표 중!\n아직 다 맞는 날이 없어요.${
+      noResp.length ? ` ${noResp.join(', ')} 아직이에요 🙏` : ''
+    } 한 번씩 봐주세요!`
     return (
       <div className="mb-5 rounded-2xl bg-maybe-light p-5">
         <p className="text-[13px] font-bold text-maybe-ink">🟡 아직 딱 맞는 날이 없어요</p>
@@ -162,14 +196,24 @@ function Hero({
             💡 안 한 {a.noneNames.length}명이 모두 가능하면 확정 추천이 돼요
           </p>
         )}
+        <div className="mt-3">
+          <CopyLine pollId={pollId} linkTo="vote" message={msg} />
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="card mb-5 p-6 text-center">
-      <p className="text-3xl">🙏</p>
-      <p className="mt-2 text-sm font-medium text-ink-600">아직 응답을 기다리고 있어요</p>
+    <div className="mb-5 rounded-2xl bg-brand-light p-5 text-center">
+      <p className="text-sm font-bold text-brand-dark">아직 아무도 투표하지 않았어요</p>
+      <p className="mt-1 text-[13px] font-medium text-ink-600">멤버들에게 링크를 보내볼까요?</p>
+      <div className="mt-3 text-left">
+        <CopyLine
+          pollId={pollId}
+          linkTo="vote"
+          message={`🗓️ "${title}" 날짜 정하자!\n링크 열어서 되는 날 O/X 찍어줘 🙏`}
+        />
+      </div>
     </div>
   )
 }
@@ -177,16 +221,34 @@ function Hero({
 // ── 다른 날짜 한 줄 ───────────────────────────────────────────────────────────
 
 function OtherRow({ a, pollId }: { a: DateAnalysis; pollId: string }) {
-  const sub =
-    a.reasons.length > 0 ? a.reasons.join(', ') : a.anchorsOk ? '필수 참석 가능' : ''
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
-      <span className="text-[15px]">{TIER_DOT[a.tier]}</span>
+    <div className="flex items-start gap-3 px-4 py-3">
+      <span className="mt-0.5 text-[15px]">{TIER_DOT[a.tier]}</span>
       <div className="min-w-0 flex-1">
         <p className="text-[15px] font-bold text-ink">
           {formatKo(a.date)} <span className="font-medium text-ink-500">가능 {a.count}명</span>
         </p>
-        {sub && <p className="truncate text-[12px] font-medium text-ink-500">{sub}</p>}
+        <div className="mt-1 flex flex-wrap gap-1">
+          {/* 막는 이유를 또렷한 칩으로 앞세운다 */}
+          {a.anchorIssues.map((ai) => (
+            <span
+              key={ai.name}
+              className="rounded-md bg-rose-50 px-1.5 py-0.5 text-[12px] font-bold text-rose-600"
+            >
+              ⭐{ai.name} {ai.status === 'X' ? '불가' : '미응답'}
+            </span>
+          ))}
+          {!a.quorumOk && (
+            <span className="rounded-md bg-maybe-light px-1.5 py-0.5 text-[12px] font-bold text-maybe-ink">
+              정족수 −{a.quorumShort}
+            </span>
+          )}
+          {a.tier === 'green' && (
+            <span className="rounded-md bg-ok-light px-1.5 py-0.5 text-[12px] font-bold text-ok-ink">
+              조건 충족
+            </span>
+          )}
+        </div>
       </div>
       <ConfirmButton pollId={pollId} pollDateId={a.pollDateId} confirmed={false} />
     </div>
