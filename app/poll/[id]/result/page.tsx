@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   return {
     title: `${bundle.poll.title} — 서른픽`,
     description: '모임 날짜 투표 결과 보기',
-    openGraph: { title: bundle.poll.title, description: '모임 날짜 투표 · 서른픽' },
+    openGraph: { title: bundle.poll.title, description: '모임 날짜 투표, 서른픽' },
   }
 }
 

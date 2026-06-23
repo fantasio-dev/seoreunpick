@@ -12,7 +12,7 @@ export async function generateMetadata({ params }: { params: { id: string } }): 
   return {
     title: `${bundle.poll.title} — 투표하기`,
     description: '날짜별로 O/X 찍고 제출하기 · 서른픽',
-    openGraph: { title: bundle.poll.title, description: '날짜 투표하기 · 서른픽' },
+    openGraph: { title: bundle.poll.title, description: '날짜 투표하기, 서른픽' },
   }
 }
 
