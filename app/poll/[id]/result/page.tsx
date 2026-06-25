@@ -49,7 +49,12 @@ export default async function ResultPage({
   const closedUnresolved = votingClosed && !confirmedDate
 
   // 히어로로 올린 날짜는 아래 "다른 날짜" 목록에서 제외
-  const heroId = confirmedDate?.id ?? rec.best?.pollDateId ?? rec.bestFallback?.pollDateId ?? null
+  // (초록·노랑이 없어도 투표가 있으면 가장 근접한 날을 히어로로 올리므로 그 날짜도 제외)
+  const heroId =
+    confirmedDate?.id ??
+    rec.best?.pollDateId ??
+    rec.bestFallback?.pollDateId ??
+    (rec.respondedMembers > 0 ? rec.ranked[0]?.pollDateId ?? null : null)
   const others = rec.ranked.filter((a) => a.pollDateId !== heroId)
 
   return (
@@ -244,14 +249,20 @@ function Hero({
     )
   }
 
-  if (rec.bestFallback) {
-    const a = rec.bestFallback
+  // 노랑(한 조건 충족)이 없어도, 투표가 있으면 가장 근접한 날(⚪ 포함)을 안내한다.
+  // 이렇게 하면 "투표는 했는데 아직 조건 미충족"인 상태를 "아무도 안 함"으로 오해시키지 않는다.
+  const fallback = rec.bestFallback ?? (rec.respondedMembers > 0 ? rec.ranked[0] ?? null : null)
+  if (fallback) {
+    const a = fallback
+    const isYellow = a.tier === 'yellow'
     const msg = `🗓️ "${title}" 날짜 투표 중!\n아직 다 맞는 날이 없어요.${
       noResp.length ? ` ${noResp.join(', ')} 아직이에요 🙏` : ''
     } 한 번씩 봐주세요!`
     return (
-      <div className="mb-5 rounded-2xl bg-maybe-light p-5">
-        <p className="text-[13px] font-bold text-maybe-ink">🟡 아직 딱 맞는 날이 없어요</p>
+      <div className={`mb-5 rounded-2xl p-5 ${isYellow ? 'bg-maybe-light' : 'bg-surface-sunken'}`}>
+        <p className={`text-[13px] font-bold ${isYellow ? 'text-maybe-ink' : 'text-ink-600'}`}>
+          {isYellow ? '🟡 아직 딱 맞는 날이 없어요' : '🤔 아직 조건을 충족한 날이 없어요'}
+        </p>
         <p className="mt-1.5 text-[24px] font-extrabold leading-tight text-ink">
           가장 근접 {formatKo(a.date)}
         </p>
@@ -272,6 +283,7 @@ function Hero({
     )
   }
 
+  // 여기는 정말 아무도 투표하지 않았을 때(respondedMembers === 0)만 도달한다.
   return (
     <div className="mb-5 rounded-2xl bg-brand-light p-5 text-center">
       <p className="text-sm font-bold text-brand-dark">아직 아무도 투표하지 않았어요</p>
