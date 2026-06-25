@@ -5,6 +5,7 @@ import Celebrate from '@/components/Celebrate'
 import ConfirmButton from '@/components/ConfirmButton'
 import CopyLine from '@/components/CopyLine'
 import PokeButton from '@/components/PokeButton'
+import RememberRoom from '@/components/RememberRoom'
 import ShareBar from '@/components/ShareBar'
 import { getPollBundle, verifyManage } from '@/lib/db'
 import { deadlineLabel, formatKo, isDeadlinePassed } from '@/lib/date'
@@ -59,6 +60,7 @@ export default async function ResultPage({
 
   return (
     <main>
+      {canManage && <RememberRoom id={poll.id} title={poll.title} token={token} />}
       <header className="mb-4">
         <Link href="/" className="text-[13px] font-bold text-ink-500">
           ← 서른픽

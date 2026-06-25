@@ -17,7 +17,7 @@ Next.js 14.2.35 (App Router) · TypeScript · Tailwind CSS · @libsql/client · 
 ```
 app/
   layout.tsx                      메타데이터(openGraph/twitter), Pretendard CDN, 컨테이너
-  page.tsx                        홈(방 만들기)
+  page.tsx                        홈(방 만들기 + 내가 만든 방 목록)
   poll/[id]/page.tsx              투표 (generateMetadata 있음, 마감 시 차단)
   poll/[id]/result/page.tsx       결과 (generateMetadata, Hero/OtherRow 내부 컴포넌트, 방장 권한 게이팅)
   poll/[id]/manage/page.tsx       방 관리 (방장 토큰 전용: 제목/정족수/마감일 수정 + 삭제)
@@ -28,11 +28,13 @@ app/
   api/poll/[id]/ics/route.ts      .ics 캘린더 내보내기
   actions.ts                      서버 액션: createPollAction / submitVoteAction / confirmDateAction
 components/                       CreateRoom, Calendar, VoteBoard, ShareBar, ConfirmButton, CopyLine,
-                                  ManageRoom(수정/삭제), PokeButton(콕 독촉), Celebrate(확정 컨페티), KakaoInit(공유SDK)
+                                  ManageRoom(수정/삭제), PokeButton(콕 독촉), Celebrate(확정 컨페티), KakaoInit(공유SDK),
+                                  MyRooms(홈: 내가 만든 방 목록), RememberRoom(방장 결과 페이지 진입 시 localStorage 기록)
 lib/
   db.ts          ★ 모든 DB 접근 (@libsql/client, async). DB 교체는 여기만
   recommend.ts   ★ 추천 알고리즘 (순수 함수, DB 모름)
   types.ts  date.ts  ics.ts  id.ts  og-font.ts(OG용 한글 폰트 CDN fetch)
+  myRooms.ts     "내가 만든 방" localStorage CRUD(무인증이라 서버가 모름, 이 기기에만 기억)
 ```
 
 ## 데이터 모델

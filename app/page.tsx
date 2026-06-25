@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import CreateRoom from '@/components/CreateRoom'
+import MyRooms from '@/components/MyRooms'
 import { DEMO_POLL_ID } from '@/lib/db'
 
 export default function HomePage() {
@@ -22,6 +23,8 @@ export default function HomePage() {
       </header>
 
       <CreateRoom />
+
+      <MyRooms />
 
       <div className="mt-9">
         <div className="mb-3 flex items-center gap-3">
