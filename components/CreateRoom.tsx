@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPollAction } from '@/app/actions'
-import { formatKo } from '@/lib/date'
+import { formatKo, todayKstYmd } from '@/lib/date'
 import Calendar from './Calendar'
 
 interface MemberInput {
@@ -23,8 +23,11 @@ export default function CreateRoom() {
   const [quorum, setQuorum] = useState<number>(2)
   const [quorumTouched, setQuorumTouched] = useState(false)
   const [showQuorum, setShowQuorum] = useState(false)
+  const [deadline, setDeadline] = useState('')
+  const [showDeadline, setShowDeadline] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const todayStr = todayKstYmd()
 
   const validCount = useMemo(
     () => members.filter((m) => m.name.trim().length > 0).length,
@@ -63,6 +66,7 @@ export default function CreateRoom() {
         quorum: effectiveQuorum,
         dates,
         members: cleanMembers,
+        deadline: deadline || null,
       })
       router.push(`/poll/${id}/result?created=1`)
     } catch (e) {
@@ -197,6 +201,42 @@ export default function CreateRoom() {
               className="h-[52px] shrink-0 rounded-2xl bg-surface-sunken px-3.5 text-[13px] font-bold text-ink-600 active:scale-95"
             >
               과반 자동
+            </button>
+          </div>
+        </Field>
+      )}
+
+      {/* 투표 마감일 — 선택. 지나면 투표가 닫히고 조건 충족 날짜로 자동 확정 */}
+      {!showDeadline ? (
+        <button
+          type="button"
+          onClick={() => setShowDeadline(true)}
+          className="flex w-full items-center justify-between rounded-2xl bg-surface-sunken px-4 py-3.5 text-left active:scale-[0.99]"
+        >
+          <span className="text-[15px] font-bold text-ink">
+            투표 마감일 <span className="text-ink-500">{deadline ? formatKo(deadline) : '없음'}</span>
+          </span>
+          <span className="text-[13px] font-bold text-brand">추가</span>
+        </button>
+      ) : (
+        <Field label="투표 마감일" hint="이 날이 지나면 투표가 닫히고 조건 충족 날짜로 자동 확정돼요">
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={deadline}
+              min={todayStr}
+              onChange={(e) => setDeadline(e.target.value)}
+              className="input flex-1"
+            />
+            <button
+              type="button"
+              onClick={() => {
+                setDeadline('')
+                setShowDeadline(false)
+              }}
+              className="h-[52px] shrink-0 rounded-2xl bg-surface-sunken px-3.5 text-[13px] font-bold text-ink-600 active:scale-95"
+            >
+              없음
             </button>
           </div>
         </Field>

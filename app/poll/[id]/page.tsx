@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import VoteBoard from '@/components/VoteBoard'
 import { getPollBundle } from '@/lib/db'
+import { deadlineLabel, formatKo, isDeadlinePassed } from '@/lib/date'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,6 +22,7 @@ export default async function VotePage({ params }: { params: { id: string } }) {
   if (!bundle) notFound()
 
   const { poll, dates, members, votes } = bundle
+  const votingClosed = isDeadlinePassed(poll.deadline)
 
   return (
     <main>
@@ -32,20 +34,43 @@ export default async function VotePage({ params }: { params: { id: string } }) {
         <p className="mt-1 text-[13px] font-medium text-ink-500">
           {poll.hostName}님의 모임, 멤버 {members.length}명, 후보 {dates.length}일
         </p>
+        {poll.deadline && !votingClosed && (
+          <p className="mt-2 inline-flex rounded-full bg-brand-light px-3 py-1 text-[12px] font-bold text-brand">
+            ⏰ {deadlineLabel(poll.deadline)}
+          </p>
+        )}
       </header>
 
-      <div className="mb-6 flex items-center justify-center gap-5 rounded-2xl bg-surface-sunken px-3 py-2.5 text-[13px] font-bold text-ink-700">
-        <Legend swatch="bg-ok" label="O 가능" />
-        <Legend swatch="bg-no" label="X 불가" />
-      </div>
+      {votingClosed ? (
+        <div className="rounded-2xl bg-surface-sunken p-6 text-center">
+          <p className="text-2xl">🔒</p>
+          <p className="mt-2 text-[17px] font-extrabold text-ink">투표가 마감됐어요</p>
+          <p className="mt-1 text-[13px] font-medium text-ink-500">
+            {poll.deadline && `${formatKo(poll.deadline)}까지였어요. `}결과를 확인해 주세요.
+          </p>
+          <Link
+            href={`/poll/${poll.id}/result`}
+            className="btn-primary mt-5 flex items-center justify-center"
+          >
+            결과 보기
+          </Link>
+        </div>
+      ) : (
+        <>
+          <div className="mb-6 flex items-center justify-center gap-5 rounded-2xl bg-surface-sunken px-3 py-2.5 text-[13px] font-bold text-ink-700">
+            <Legend swatch="bg-ok" label="O 가능" />
+            <Legend swatch="bg-no" label="X 불가" />
+          </div>
 
-      <VoteBoard pollId={poll.id} members={members} dates={dates} votes={votes} />
+          <VoteBoard pollId={poll.id} members={members} dates={dates} votes={votes} />
 
-      <div className="mt-8 text-center">
-        <Link href={`/poll/${poll.id}/result`} className="text-sm font-bold text-brand">
-          결과 보러 가기 →
-        </Link>
-      </div>
+          <div className="mt-8 text-center">
+            <Link href={`/poll/${poll.id}/result`} className="text-sm font-bold text-brand">
+              결과 보러 가기 →
+            </Link>
+          </div>
+        </>
+      )}
     </main>
   )
 }

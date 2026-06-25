@@ -1,7 +1,8 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createPoll, setConfirmedDate, upsertVotes } from '@/lib/db'
+import { createPoll, getPollBundle, setConfirmedDate, upsertVotes } from '@/lib/db'
+import { isDeadlinePassed, todayKstYmd } from '@/lib/date'
 import type { CreatePollInput, VoteEntry } from '@/lib/types'
 
 /** 방 생성 → 새 poll id 반환. 클라이언트가 받아서 결과 페이지로 이동한다. */
@@ -23,7 +24,11 @@ export async function createPollAction(input: CreatePollInput): Promise<{ id: st
   const quorum = Math.min(Math.max(1, Math.round(input.quorum)), members.length)
   const hostName = input.hostName.trim() || members[0].name
 
-  const id = await createPoll({ title, hostName, quorum, dates, members })
+  // 마감일(선택): 지난 날짜면 무시
+  let deadline: string | null = input.deadline?.trim() || null
+  if (deadline && deadline < todayKstYmd()) deadline = null
+
+  const id = await createPoll({ title, hostName, quorum, dates, members, deadline })
   return { id }
 }
 
@@ -33,6 +38,11 @@ export async function submitVoteAction(
   memberId: number,
   entries: VoteEntry[],
 ): Promise<{ ok: true }> {
+  // 마감 지난 방은 추가 투표 차단 (getPollBundle 이 마감 자동 확정도 함께 처리)
+  const bundle = await getPollBundle(pollId)
+  if (!bundle) throw new Error('방을 찾을 수 없어요.')
+  if (isDeadlinePassed(bundle.poll.deadline)) throw new Error('투표가 마감됐어요.')
+
   await upsertVotes(pollId, memberId, entries)
   revalidatePath(`/poll/${pollId}`)
   revalidatePath(`/poll/${pollId}/result`)

@@ -11,6 +11,7 @@ export interface PollMeta {
   quorum: number
   status: PollStatus
   confirmedPollDateId: number | null
+  deadline: string | null // YYYY-MM-DD, 이 날이 지나면 투표 마감 + 자동 확정 (없으면 무기한)
   createdAt: string
 }
 
@@ -47,6 +48,7 @@ export interface CreatePollInput {
   quorum: number
   dates: string[]
   members: { name: string; isAnchor: boolean }[]
+  deadline?: string | null // YYYY-MM-DD (선택). 없으면 무기한
 }
 
 /** 투표 제출 입력 (한 멤버의 날짜별 응답) */

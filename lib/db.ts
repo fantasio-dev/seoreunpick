@@ -1,6 +1,8 @@
 import { createClient, type Client, type InStatement } from '@libsql/client'
 import fs from 'node:fs'
 import path from 'node:path'
+import { isDeadlinePassed } from './date'
+import { analyze } from './recommend'
 import { newId } from './id'
 import type {
   CreatePollInput,
@@ -30,6 +32,7 @@ CREATE TABLE IF NOT EXISTS poll (
   quorum                 INTEGER NOT NULL,
   status                 TEXT NOT NULL DEFAULT 'open',
   confirmed_poll_date_id INTEGER,
+  deadline               TEXT,
   created_at             TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -85,7 +88,18 @@ function ready(): Promise<void> {
 }
 async function init(): Promise<void> {
   await client.executeMultiple(SCHEMA)
+  await migrate()
   await seedIfEmpty()
+}
+
+/** 이미 만들어진(운영 Turso) 테이블에 누락 컬럼을 더한다. CREATE IF NOT EXISTS 로는 못 한다. */
+async function migrate(): Promise<void> {
+  await addColumnIfMissing('poll', 'deadline', 'TEXT')
+}
+async function addColumnIfMissing(table: string, column: string, type: string): Promise<void> {
+  const info = await client.execute(`PRAGMA table_info(${table})`)
+  const has = info.rows.some((r) => String(r.name) === column)
+  if (!has) await client.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`)
 }
 
 // ── 매핑 헬퍼 (snake_case 행 → 도메인 타입) ──────────────────────────────────
@@ -100,6 +114,7 @@ function mapPoll(row: Row): PollMeta {
     quorum: Number(row.quorum),
     status: String(row.status) as PollStatus,
     confirmedPollDateId: row.confirmed_poll_date_id == null ? null : Number(row.confirmed_poll_date_id),
+    deadline: row.deadline == null ? null : String(row.deadline),
     createdAt: String(row.created_at),
   }
 }
@@ -111,8 +126,8 @@ export async function createPoll(input: CreatePollInput): Promise<string> {
   const id = input.id ?? newId()
   const stmts: InStatement[] = [
     {
-      sql: `INSERT INTO poll (id, title, host_name, quorum, status) VALUES (?, ?, ?, ?, 'open')`,
-      args: [id, input.title, input.hostName, input.quorum],
+      sql: `INSERT INTO poll (id, title, host_name, quorum, status, deadline) VALUES (?, ?, ?, ?, 'open', ?)`,
+      args: [id, input.title, input.hostName, input.quorum, input.deadline ?? null],
     },
     ...input.dates.map((d) => ({
       sql: `INSERT INTO poll_date (poll_id, date) VALUES (?, ?)`,
@@ -185,12 +200,25 @@ export async function getPollBundle(pollId: string): Promise<PollBundle | null> 
     status: String(r.status) as VoteStatus,
   }))
 
-  return {
+  const bundle: PollBundle = {
     poll: mapPoll(pollRes.rows[0] as Row),
     dates: datesRes.rows.map((r) => ({ id: Number(r.id), date: String(r.date) })),
     members,
     votes,
   }
+
+  // 마감 자동 확정: cron 이 없으므로 읽는 시점에 게으르게(lazy) 처리한다.
+  // 마감일이 지났고 아직 open 이면, 조건(앵커+정족수)을 충족한 대표 날짜로 자동 확정.
+  // 충족 날짜가 없으면 확정하지 않고 open 으로 둔다(투표만 닫힘 → 방장이 직접 고름).
+  if (bundle.poll.status === 'open' && isDeadlinePassed(bundle.poll.deadline)) {
+    const best = analyze(bundle).best
+    if (best) {
+      await setConfirmedDate(pollId, best.pollDateId)
+      bundle.poll = { ...bundle.poll, status: 'confirmed', confirmedPollDateId: best.pollDateId }
+    }
+  }
+
+  return bundle
 }
 
 // ── 시드 ─────────────────────────────────────────────────────────────────────
@@ -199,8 +227,8 @@ async function seedIfEmpty(): Promise<void> {
   const SEED_ID = 'demo'
   // 데모 방을 OR IGNORE 로 선점 — 이미 있으면 rowsAffected=0 이라 race-safe
   const claim = await client.execute({
-    sql: `INSERT OR IGNORE INTO poll (id, title, host_name, quorum, status) VALUES (?, ?, ?, ?, 'open')`,
-    args: [SEED_ID, '서른개 7월 정모 (윤이사님 승진 축하)', '최태석', 5],
+    sql: `INSERT OR IGNORE INTO poll (id, title, host_name, quorum, status, deadline) VALUES (?, ?, ?, ?, 'open', ?)`,
+    args: [SEED_ID, '서른개 7월 정모 (윤이사님 승진 축하)', '최태석', 5, '2026-07-06'],
   })
   if (claim.rowsAffected === 0) return // 이미 시드됨
 

@@ -40,3 +40,34 @@ export function nextDayIcs(s: string): string {
   const nd = String(next.getDate()).padStart(2, '0')
   return `${ny}${nm}${nd}`
 }
+
+// ── 마감일 (KST 기준) ─────────────────────────────────────────────────────────
+// 서버는 Vercel(UTC)에서 돌 수 있어 "오늘"을 항상 KST(UTC+9)로 계산한다.
+
+/** KST 기준 오늘 "YYYY-MM-DD" */
+export function todayKstYmd(): string {
+  const kst = new Date(Date.now() + 9 * 60 * 60 * 1000)
+  return kst.toISOString().slice(0, 10)
+}
+
+/** 마감일이 지났는지 (마감일 당일까지는 투표 가능, 다음 날부터 마감) */
+export function isDeadlinePassed(deadline: string | null | undefined): boolean {
+  return !!deadline && todayKstYmd() > deadline
+}
+
+/** KST 오늘 → dateStr 까지 남은 일수 (0=오늘, 음수=지남) */
+export function daysUntil(dateStr: string): number {
+  const a = parseYmd(todayKstYmd())
+  const b = parseYmd(dateStr)
+  const da = Date.UTC(a.y, a.m - 1, a.d)
+  const db = Date.UTC(b.y, b.m - 1, b.d)
+  return Math.round((db - da) / 86400000)
+}
+
+/** "투표 마감 D-3, 7월 6일 (월)" / "오늘 투표 마감" / "투표 마감됨" */
+export function deadlineLabel(deadline: string): string {
+  const d = daysUntil(deadline)
+  if (d < 0) return '투표 마감됨'
+  if (d === 0) return '오늘 투표 마감'
+  return `투표 마감 D-${d}, ${formatKo(deadline)}`
+}

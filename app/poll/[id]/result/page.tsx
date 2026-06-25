@@ -5,7 +5,7 @@ import ConfirmButton from '@/components/ConfirmButton'
 import CopyLine from '@/components/CopyLine'
 import ShareBar from '@/components/ShareBar'
 import { getPollBundle } from '@/lib/db'
-import { formatKo } from '@/lib/date'
+import { deadlineLabel, formatKo, isDeadlinePassed } from '@/lib/date'
 import { analyze, type DateAnalysis } from '@/lib/recommend'
 
 export const dynamic = 'force-dynamic'
@@ -39,6 +39,9 @@ export default async function ResultPage({
     ? dates.find((d) => d.id === poll.confirmedPollDateId)
     : null
   const justCreated = searchParams.created === '1'
+  const votingClosed = isDeadlinePassed(poll.deadline)
+  // 마감됐는데 자동 확정이 안 됨(조건 충족 날짜 없음) → 방장이 직접 골라야 함
+  const closedUnresolved = votingClosed && !confirmedDate
 
   // 히어로로 올린 날짜는 아래 "다른 날짜" 목록에서 제외
   const heroId = confirmedDate?.id ?? rec.best?.pollDateId ?? rec.bestFallback?.pollDateId ?? null
@@ -54,16 +57,32 @@ export default async function ResultPage({
         <p className="mt-1 text-[13px] font-medium text-ink-500">
           {poll.hostName}님의 모임, 멤버 {members.length}명, 정족수 {poll.quorum}명
         </p>
+        {poll.deadline && !votingClosed && (
+          <p className="mt-2 inline-flex rounded-full bg-brand-light px-3 py-1 text-[12px] font-bold text-brand">
+            ⏰ {deadlineLabel(poll.deadline)}
+          </p>
+        )}
       </header>
 
       <div className="mb-4">
         <ShareBar pollId={poll.id} highlight={justCreated} />
       </div>
 
+      {closedUnresolved && (
+        <div className="mb-4 rounded-2xl bg-maybe-light p-4">
+          <p className="text-[13px] font-bold text-maybe-ink">⏰ 투표가 마감됐어요</p>
+          <p className="mt-1 text-[13px] font-medium text-ink-700">
+            조건(필수 참석자, 정족수)을 충족한 날짜가 없어 자동 확정되지 않았어요. 아래에서 직접 골라 확정해 주세요.
+          </p>
+        </div>
+      )}
+
       {/* 히어로 — 확정됨 / 추천 1개 크게 */}
       {confirmedDate ? (
         <div className="mb-5 rounded-2xl bg-ok-light p-5">
-          <p className="text-[13px] font-bold text-ok-ink">✅ 날짜가 확정됐어요</p>
+          <p className="text-[13px] font-bold text-ok-ink">
+            ✅ 날짜가 확정됐어요{poll.deadline && votingClosed ? ' (마감 자동 확정)' : ''}
+          </p>
           <p className="mt-1.5 text-[30px] font-extrabold leading-tight text-ink">
             {formatKo(confirmedDate.date)}
           </p>
@@ -100,16 +119,30 @@ export default async function ResultPage({
           </p>
         </div>
         {rec.noResponseMembers.length > 0 ? (
-          <div className="flex flex-wrap gap-1.5">
-            {rec.noResponseMembers.map((n) => (
-              <span
-                key={n}
-                className="rounded-full border border-dashed border-line-strong px-3 py-1 text-[13px] font-medium text-ink-600"
-              >
-                {n}
-              </span>
-            ))}
-          </div>
+          <>
+            <div className="flex flex-wrap gap-1.5">
+              {rec.noResponseMembers.map((n) => (
+                <span
+                  key={n}
+                  className="rounded-full border border-dashed border-line-strong px-3 py-1 text-[13px] font-medium text-ink-600"
+                >
+                  {n}
+                </span>
+              ))}
+            </div>
+            {/* 미응답 독촉 — 마감 전, 미확정일 때만 */}
+            {!confirmedDate && !votingClosed && (
+              <div className="mt-3">
+                <CopyLine
+                  pollId={poll.id}
+                  linkTo="vote"
+                  message={`⏰ "${poll.title}" 날짜 투표 아직이에요${
+                    poll.deadline ? ` (${deadlineLabel(poll.deadline)})` : ''
+                  }\n${rec.noResponseMembers.join(', ')} 링크 열고 O/X만 찍어주면 끝이에요 🙏`}
+                />
+              </div>
+            )}
+          </>
         ) : (
           <p className="text-[13px] font-bold text-ok-ink">🎉 전원 응답 완료!</p>
         )}
