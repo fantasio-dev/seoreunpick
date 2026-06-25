@@ -20,7 +20,7 @@ app/
   page.tsx                        홈(방 만들기 + 내가 만든 방 목록)
   poll/[id]/page.tsx              투표 (generateMetadata 있음, 마감 시 차단)
   poll/[id]/result/page.tsx       결과 (generateMetadata, Hero/OtherRow 내부 컴포넌트, 방장 권한 게이팅)
-  poll/[id]/manage/page.tsx       방 관리 (방장 토큰 전용: 제목/정족수/마감일 수정 + 삭제)
+  poll/[id]/manage/page.tsx       방 관리 (방장 토큰 전용: 제목/정족수/마감일/멤버 수정 + 삭제)
   poll/[id]/opengraph-image.tsx   방별 동적 OG (모임명+현황 카드)
   poll/[id]/result/opengraph-image.tsx  부모 OG 재export (결과 링크용)
   opengraph-image.tsx             브랜드 OG

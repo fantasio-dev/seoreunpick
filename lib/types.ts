@@ -52,11 +52,19 @@ export interface CreatePollInput {
   manageToken?: string // 시드용 고정 토큰 (없으면 자동 생성)
 }
 
-/** 방 메타 수정 입력 (방장 전용, 날짜/멤버는 제외) */
+/** 멤버 수정 입력. 기존 멤버는 id 유지(투표 보존), 새 멤버는 id=null */
+export interface MemberInput {
+  id: number | null
+  name: string
+  isAnchor: boolean
+}
+
+/** 방 메타 수정 입력 (방장 전용, 날짜는 제외) */
 export interface UpdatePollInput {
   title: string
   quorum: number
   deadline: string | null
+  members: MemberInput[]
 }
 
 /** 투표 제출 입력 (한 멤버의 날짜별 응답) */

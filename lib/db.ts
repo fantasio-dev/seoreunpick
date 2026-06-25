@@ -6,11 +6,11 @@ import { analyze } from './recommend'
 import { newId } from './id'
 import type {
   CreatePollInput,
+  MemberInput,
   MemberRow,
   PollBundle,
   PollMeta,
   PollStatus,
-  UpdatePollInput,
   VoteEntry,
   VoteRow,
   VoteStatus,
@@ -161,12 +161,55 @@ export async function verifyManage(pollId: string, token: string | null | undefi
 }
 
 /** 방 메타(제목/정족수/마감일) 수정. 날짜·멤버는 건드리지 않는다. */
-export async function updatePollMeta(pollId: string, input: UpdatePollInput): Promise<void> {
+export async function updatePollMeta(
+  pollId: string,
+  meta: { title: string; quorum: number; deadline: string | null },
+): Promise<void> {
   await ready()
   await client.execute({
     sql: `UPDATE poll SET title = ?, quorum = ?, deadline = ? WHERE id = ?`,
-    args: [input.title, input.quorum, input.deadline, pollId],
+    args: [meta.title, meta.quorum, meta.deadline, pollId],
   })
+}
+
+/**
+ * 멤버 동기화(방장 수정용). 기존 투표와의 정합성을 위해 id 기준으로 처리한다.
+ *  - id 있고 기존에 존재 → 이름/앵커만 UPDATE (그 멤버의 투표는 그대로 보존)
+ *  - id 없음(또는 미존재) → 새 멤버 INSERT
+ *  - 기존에 있었는데 목록에서 빠짐 → 멤버 + 그 멤버의 투표 DELETE
+ */
+export async function updateMembers(pollId: string, members: MemberInput[]): Promise<void> {
+  await ready()
+  const existing = await client.execute({
+    sql: `SELECT id FROM member WHERE poll_id = ?`,
+    args: [pollId],
+  })
+  const existingIds = new Set(existing.rows.map((r) => Number(r.id)))
+  const keepIds = new Set<number>()
+  const stmts: InStatement[] = []
+
+  for (const m of members) {
+    if (m.id != null && existingIds.has(m.id)) {
+      keepIds.add(m.id)
+      stmts.push({
+        sql: `UPDATE member SET name = ?, is_anchor = ? WHERE id = ? AND poll_id = ?`,
+        args: [m.name, m.isAnchor ? 1 : 0, m.id, pollId],
+      })
+    } else {
+      stmts.push({
+        sql: `INSERT INTO member (poll_id, name, is_anchor) VALUES (?, ?, ?)`,
+        args: [pollId, m.name, m.isAnchor ? 1 : 0],
+      })
+    }
+  }
+
+  for (const id of existingIds) {
+    if (keepIds.has(id)) continue
+    stmts.push({ sql: `DELETE FROM vote WHERE member_id = ?`, args: [id] })
+    stmts.push({ sql: `DELETE FROM member WHERE id = ? AND poll_id = ?`, args: [id, pollId] })
+  }
+
+  await client.batch(stmts, 'write')
 }
 
 /** 방 삭제. 자식 행(날짜/멤버/투표)도 함께 지운다(FK CASCADE 미보장 환경 대비 명시 삭제). */

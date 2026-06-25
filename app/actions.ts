@@ -6,6 +6,7 @@ import {
   deletePoll,
   getPollBundle,
   setConfirmedDate,
+  updateMembers,
   updatePollMeta,
   upsertVotes,
   verifyManage,
@@ -71,7 +72,7 @@ export async function confirmDateAction(
   return { ok: true }
 }
 
-/** 방 메타 수정(제목/정족수/마감일). 방장만 가능. */
+/** 방 메타 수정(제목/정족수/마감일 + 멤버). 방장만 가능. */
 export async function updatePollAction(
   pollId: string,
   token: string,
@@ -84,10 +85,21 @@ export async function updatePollAction(
 
   const title = input.title.trim()
   if (!title) throw new Error('모임명을 입력해주세요.')
-  const quorum = Math.min(Math.max(1, Math.round(input.quorum)), bundle.members.length)
+
+  // 멤버 정리: 이름 trim + 빈 항목 제거. 기존 멤버는 id 유지(투표 보존)
+  const members = input.members
+    .map((m) => ({ id: m.id, name: m.name.trim(), isAnchor: m.isAnchor }))
+    .filter((m) => m.name.length > 0)
+  if (members.length < 2) throw new Error('멤버를 2명 이상 입력해주세요.')
+  const names = members.map((m) => m.name)
+  if (new Set(names).size !== names.length) throw new Error('멤버 이름이 중복됩니다.')
+
+  // 멤버 수가 줄면 정족수를 멤버 수 이내로 클램프
+  const quorum = Math.min(Math.max(1, Math.round(input.quorum)), members.length)
   let deadline: string | null = input.deadline?.trim() || null
   if (deadline && deadline < todayKstYmd()) deadline = null
 
+  await updateMembers(pollId, members)
   await updatePollMeta(pollId, { title, quorum, deadline })
   revalidatePath(`/poll/${pollId}`)
   revalidatePath(`/poll/${pollId}/result`)

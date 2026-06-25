@@ -46,14 +46,18 @@ export default async function ManagePage({
           ← 결과로
         </Link>
         <h1 className="mt-1.5 text-[22px] font-extrabold leading-snug text-ink">방 관리</h1>
-        <p className="mt-1 text-[13px] font-medium text-ink-500">제목, 정족수, 마감일을 바꾸거나 방을 삭제해요</p>
+        <p className="mt-1 text-[13px] font-medium text-ink-500">제목, 멤버, 정족수, 마감일을 바꾸거나 방을 삭제해요</p>
       </header>
 
       <ManageRoom
         pollId={poll.id}
         token={token}
-        memberCount={members.length}
-        initial={{ title: poll.title, quorum: poll.quorum, deadline: poll.deadline }}
+        initial={{
+          title: poll.title,
+          quorum: poll.quorum,
+          deadline: poll.deadline,
+          members: members.map((m) => ({ id: m.id, name: m.name, isAnchor: m.isAnchor })),
+        }}
       />
     </main>
   )
