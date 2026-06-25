@@ -261,7 +261,7 @@ function Hero({
     return (
       <div className={`mb-5 rounded-2xl p-5 ${isYellow ? 'bg-maybe-light' : 'bg-surface-sunken'}`}>
         <p className={`text-[13px] font-bold ${isYellow ? 'text-maybe-ink' : 'text-ink-600'}`}>
-          {isYellow ? '🟡 아직 딱 맞는 날이 없어요' : '🤔 아직 조건을 충족한 날이 없어요'}
+          🗳️ 아직 투표 중이에요
         </p>
         <p className="mt-1.5 text-[24px] font-extrabold leading-tight text-ink">
           가장 근접 {formatKo(a.date)}
