@@ -1,12 +1,22 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createPoll, getPollBundle, setConfirmedDate, upsertVotes } from '@/lib/db'
+import {
+  createPoll,
+  deletePoll,
+  getPollBundle,
+  setConfirmedDate,
+  updatePollMeta,
+  upsertVotes,
+  verifyManage,
+} from '@/lib/db'
 import { isDeadlinePassed, todayKstYmd } from '@/lib/date'
-import type { CreatePollInput, VoteEntry } from '@/lib/types'
+import type { CreatePollInput, UpdatePollInput, VoteEntry } from '@/lib/types'
 
-/** 방 생성 → 새 poll id 반환. 클라이언트가 받아서 결과 페이지로 이동한다. */
-export async function createPollAction(input: CreatePollInput): Promise<{ id: string }> {
+/** 방 생성 → 새 poll id + 방장 관리 토큰 반환. 클라이언트가 받아서 관리 링크로 이동한다. */
+export async function createPollAction(
+  input: CreatePollInput,
+): Promise<{ id: string; manageToken: string }> {
   const title = input.title.trim()
   const members = input.members
     .map((m) => ({ name: m.name.trim(), isAnchor: m.isAnchor }))
@@ -28,8 +38,7 @@ export async function createPollAction(input: CreatePollInput): Promise<{ id: st
   let deadline: string | null = input.deadline?.trim() || null
   if (deadline && deadline < todayKstYmd()) deadline = null
 
-  const id = await createPoll({ title, hostName, quorum, dates, members, deadline })
-  return { id }
+  return createPoll({ title, hostName, quorum, dates, members, deadline })
 }
 
 /** 한 멤버의 투표 제출/수정. */
@@ -49,13 +58,45 @@ export async function submitVoteAction(
   return { ok: true }
 }
 
-/** 날짜 확정 / 해제. */
+/** 날짜 확정 / 해제. 방장(관리 토큰)만 가능. */
 export async function confirmDateAction(
   pollId: string,
   pollDateId: number | null,
+  token?: string,
 ): Promise<{ ok: true }> {
+  if (!(await verifyManage(pollId, token))) throw new Error('방장만 확정할 수 있어요.')
   await setConfirmedDate(pollId, pollDateId)
   revalidatePath(`/poll/${pollId}`)
   revalidatePath(`/poll/${pollId}/result`)
+  return { ok: true }
+}
+
+/** 방 메타 수정(제목/정족수/마감일). 방장만 가능. */
+export async function updatePollAction(
+  pollId: string,
+  token: string,
+  input: UpdatePollInput,
+): Promise<{ ok: true }> {
+  if (!(await verifyManage(pollId, token))) throw new Error('방장만 수정할 수 있어요.')
+
+  const bundle = await getPollBundle(pollId)
+  if (!bundle) throw new Error('방을 찾을 수 없어요.')
+
+  const title = input.title.trim()
+  if (!title) throw new Error('모임명을 입력해주세요.')
+  const quorum = Math.min(Math.max(1, Math.round(input.quorum)), bundle.members.length)
+  let deadline: string | null = input.deadline?.trim() || null
+  if (deadline && deadline < todayKstYmd()) deadline = null
+
+  await updatePollMeta(pollId, { title, quorum, deadline })
+  revalidatePath(`/poll/${pollId}`)
+  revalidatePath(`/poll/${pollId}/result`)
+  return { ok: true }
+}
+
+/** 방 삭제. 방장만 가능. */
+export async function deletePollAction(pollId: string, token: string): Promise<{ ok: true }> {
+  if (!(await verifyManage(pollId, token))) throw new Error('방장만 삭제할 수 있어요.')
+  await deletePoll(pollId)
   return { ok: true }
 }

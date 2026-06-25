@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next'
+import KakaoInit from '@/components/KakaoInit'
 import './globals.css'
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://seoreunpick.vercel.app'
@@ -37,6 +38,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <div className="mx-auto min-h-dvh max-w-md bg-surface-page px-5 pb-20 pt-6">{children}</div>
+        <KakaoInit />
       </body>
     </html>
   )

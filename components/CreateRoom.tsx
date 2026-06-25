@@ -60,7 +60,7 @@ export default function CreateRoom() {
 
     setSubmitting(true)
     try {
-      const { id } = await createPollAction({
+      const { id, manageToken } = await createPollAction({
         title: title.trim(),
         hostName: '', // 방장 = 첫 번째 멤버 (서버에서 기본값 처리)
         quorum: effectiveQuorum,
@@ -68,7 +68,8 @@ export default function CreateRoom() {
         members: cleanMembers,
         deadline: deadline || null,
       })
-      router.push(`/poll/${id}/result?created=1`)
+      // 토큰이 붙은 결과 링크 = 방장 관리 링크. 친구에겐 토큰 없는 링크를 공유한다.
+      router.push(`/poll/${id}/result?created=1&t=${manageToken}`)
     } catch (e) {
       setError(e instanceof Error ? e.message : '방 생성에 실패했어요.')
       setSubmitting(false)

@@ -8,10 +8,11 @@ interface Props {
   pollId: string
   pollDateId: number
   confirmed: boolean
+  token: string
   variant?: 'primary' | 'ghost'
 }
 
-export default function ConfirmButton({ pollId, pollDateId, confirmed, variant = 'ghost' }: Props) {
+export default function ConfirmButton({ pollId, pollDateId, confirmed, token, variant = 'ghost' }: Props) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [busy, setBusy] = useState(false)
@@ -19,7 +20,7 @@ export default function ConfirmButton({ pollId, pollDateId, confirmed, variant =
   function act(next: number | null) {
     setBusy(true)
     start(async () => {
-      await confirmDateAction(pollId, next)
+      await confirmDateAction(pollId, next, token)
       router.refresh()
       setBusy(false)
     })

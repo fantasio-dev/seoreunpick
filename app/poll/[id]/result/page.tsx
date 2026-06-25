@@ -1,10 +1,12 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import Celebrate from '@/components/Celebrate'
 import ConfirmButton from '@/components/ConfirmButton'
 import CopyLine from '@/components/CopyLine'
+import PokeButton from '@/components/PokeButton'
 import ShareBar from '@/components/ShareBar'
-import { getPollBundle } from '@/lib/db'
+import { getPollBundle, verifyManage } from '@/lib/db'
 import { deadlineLabel, formatKo, isDeadlinePassed } from '@/lib/date'
 import { analyze, type DateAnalysis } from '@/lib/recommend'
 
@@ -27,7 +29,7 @@ export default async function ResultPage({
   searchParams,
 }: {
   params: { id: string }
-  searchParams: { created?: string }
+  searchParams: { created?: string; t?: string }
 }) {
   const bundle = await getPollBundle(params.id)
   if (!bundle) notFound()
@@ -40,6 +42,9 @@ export default async function ResultPage({
     : null
   const justCreated = searchParams.created === '1'
   const votingClosed = isDeadlinePassed(poll.deadline)
+  // 방장 관리 토큰(?t=). 일치하면 확정/관리 가능. 토큰은 클라이언트에 그대로 노출하지 않고 권한 판단에만 쓴다.
+  const token = searchParams.t ?? ''
+  const canManage = await verifyManage(poll.id, token)
   // 마감됐는데 자동 확정이 안 됨(조건 충족 날짜 없음) → 방장이 직접 골라야 함
   const closedUnresolved = votingClosed && !confirmedDate
 
@@ -65,8 +70,20 @@ export default async function ResultPage({
       </header>
 
       <div className="mb-4">
-        <ShareBar pollId={poll.id} highlight={justCreated} />
+        <ShareBar pollId={poll.id} title={poll.title} highlight={justCreated} />
       </div>
+
+      {canManage && (
+        <div className="mb-4 flex items-center justify-between rounded-2xl bg-surface-sunken px-4 py-2.5">
+          <span className="text-[13px] font-bold text-ink-700">👑 방장이에요 (이 링크로 관리)</span>
+          <Link
+            href={`/poll/${poll.id}/manage?t=${token}`}
+            className="text-[13px] font-bold text-brand"
+          >
+            방 수정/삭제
+          </Link>
+        </div>
+      )}
 
       {closedUnresolved && (
         <div className="mb-4 rounded-2xl bg-maybe-light p-4">
@@ -80,6 +97,7 @@ export default async function ResultPage({
       {/* 히어로 — 확정됨 / 추천 1개 크게 */}
       {confirmedDate ? (
         <div className="mb-5 rounded-2xl bg-ok-light p-5">
+          <Celebrate pollId={poll.id} />
           <p className="text-[13px] font-bold text-ok-ink">
             ✅ 날짜가 확정됐어요{poll.deadline && votingClosed ? ' (마감 자동 확정)' : ''}
           </p>
@@ -94,7 +112,9 @@ export default async function ResultPage({
             >
               📅 캘린더에 저장
             </a>
-            <ConfirmButton pollId={poll.id} pollDateId={confirmedDate.id} confirmed />
+            {canManage && (
+              <ConfirmButton pollId={poll.id} pollDateId={confirmedDate.id} confirmed token={token} />
+            )}
           </div>
           <div className="mt-3">
             <CopyLine
@@ -106,7 +126,14 @@ export default async function ResultPage({
           </div>
         </div>
       ) : (
-        <Hero rec={rec} anchorNames={anchorNames} pollId={poll.id} title={poll.title} />
+        <Hero
+          rec={rec}
+          anchorNames={anchorNames}
+          pollId={poll.id}
+          title={poll.title}
+          canManage={canManage}
+          token={token}
+        />
       )}
 
       {/* 안 한 사람 */}
@@ -120,17 +147,14 @@ export default async function ResultPage({
         </div>
         {rec.noResponseMembers.length > 0 ? (
           <>
+            {/* 이름 칩을 탭하면 그 사람만 콕 찌르는 개인 독촉 문구가 복사돼요 */}
             <div className="flex flex-wrap gap-1.5">
               {rec.noResponseMembers.map((n) => (
-                <span
-                  key={n}
-                  className="rounded-full border border-dashed border-line-strong px-3 py-1 text-[13px] font-medium text-ink-600"
-                >
-                  {n}
-                </span>
+                <PokeButton key={n} pollId={poll.id} name={n} title={poll.title} />
               ))}
             </div>
-            {/* 미응답 독촉 — 마감 전, 미확정일 때만 */}
+            <p className="mt-2 text-[12px] font-medium text-ink-400">이름을 탭하면 콕 찌르는 문구가 복사돼요</p>
+            {/* 전체 독촉 — 마감 전, 미확정일 때만 */}
             {!confirmedDate && !votingClosed && (
               <div className="mt-3">
                 <CopyLine
@@ -154,7 +178,7 @@ export default async function ResultPage({
           <h2 className="mb-2 text-[13px] font-bold text-ink-500">다른 날짜</h2>
           <div className="card divide-y divide-line/70">
             {others.map((a) => (
-              <OtherRow key={a.pollDateId} a={a} pollId={poll.id} />
+              <OtherRow key={a.pollDateId} a={a} pollId={poll.id} canManage={canManage} token={token} />
             ))}
           </div>
         </section>
@@ -176,11 +200,15 @@ function Hero({
   anchorNames,
   pollId,
   title,
+  canManage,
+  token,
 }: {
   rec: ReturnType<typeof analyze>
   anchorNames: string[]
   pollId: string
   title: string
+  canManage: boolean
+  token: string
 }) {
   const noResp = rec.noResponseMembers
 
@@ -198,9 +226,17 @@ function Hero({
         <p className="mt-1.5 text-sm font-medium text-ink-700">
           가능 {a.count}명{anchorLine}
         </p>
-        <div className="mt-4">
-          <ConfirmButton pollId={pollId} pollDateId={a.pollDateId} confirmed={false} variant="primary" />
-        </div>
+        {canManage && (
+          <div className="mt-4">
+            <ConfirmButton
+              pollId={pollId}
+              pollDateId={a.pollDateId}
+              confirmed={false}
+              token={token}
+              variant="primary"
+            />
+          </div>
+        )}
         <div className="mt-3">
           <CopyLine pollId={pollId} linkTo="vote" tone="ok" message={msg} />
         </div>
@@ -253,7 +289,17 @@ function Hero({
 
 // ── 다른 날짜 한 줄 ───────────────────────────────────────────────────────────
 
-function OtherRow({ a, pollId }: { a: DateAnalysis; pollId: string }) {
+function OtherRow({
+  a,
+  pollId,
+  canManage,
+  token,
+}: {
+  a: DateAnalysis
+  pollId: string
+  canManage: boolean
+  token: string
+}) {
   return (
     <div className="flex items-start gap-3 px-4 py-3">
       <span className="mt-0.5 text-[15px]">{TIER_DOT[a.tier]}</span>
@@ -283,7 +329,9 @@ function OtherRow({ a, pollId }: { a: DateAnalysis; pollId: string }) {
           )}
         </div>
       </div>
-      <ConfirmButton pollId={pollId} pollDateId={a.pollDateId} confirmed={false} />
+      {canManage && (
+        <ConfirmButton pollId={pollId} pollDateId={a.pollDateId} confirmed={false} token={token} />
+      )}
     </div>
   )
 }

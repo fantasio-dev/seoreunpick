@@ -18,15 +18,17 @@ Next.js 14.2.35 (App Router) · TypeScript · Tailwind CSS · @libsql/client · 
 app/
   layout.tsx                      메타데이터(openGraph/twitter), Pretendard CDN, 컨테이너
   page.tsx                        홈(방 만들기)
-  poll/[id]/page.tsx              투표 (generateMetadata 있음)
-  poll/[id]/result/page.tsx       결과 (generateMetadata, Hero/OtherRow 내부 컴포넌트)
+  poll/[id]/page.tsx              투표 (generateMetadata 있음, 마감 시 차단)
+  poll/[id]/result/page.tsx       결과 (generateMetadata, Hero/OtherRow 내부 컴포넌트, 방장 권한 게이팅)
+  poll/[id]/manage/page.tsx       방 관리 (방장 토큰 전용: 제목/정족수/마감일 수정 + 삭제)
   poll/[id]/opengraph-image.tsx   방별 동적 OG (모임명+현황 카드)
   poll/[id]/result/opengraph-image.tsx  부모 OG 재export (결과 링크용)
   opengraph-image.tsx             브랜드 OG
   icon.svg                        파비콘(블루 체크)
   api/poll/[id]/ics/route.ts      .ics 캘린더 내보내기
   actions.ts                      서버 액션: createPollAction / submitVoteAction / confirmDateAction
-components/                       CreateRoom, Calendar, VoteBoard, ShareBar, ConfirmButton, CopyLine
+components/                       CreateRoom, Calendar, VoteBoard, ShareBar, ConfirmButton, CopyLine,
+                                  ManageRoom(수정/삭제), PokeButton(콕 독촉), Celebrate(확정 컨페티), KakaoInit(공유SDK)
 lib/
   db.ts          ★ 모든 DB 접근 (@libsql/client, async). DB 교체는 여기만
   recommend.ts   ★ 추천 알고리즘 (순수 함수, DB 모름)
@@ -35,13 +37,15 @@ lib/
 
 ## 데이터 모델
 ```
-poll(id, title, host_name, quorum, status['open'|'confirmed'], confirmed_poll_date_id, deadline 'YYYY-MM-DD'|null, created_at)
+poll(id, title, host_name, quorum, status['open'|'confirmed'], confirmed_poll_date_id, deadline 'YYYY-MM-DD'|null, manage_token, created_at)
 poll_date(id, poll_id, date 'YYYY-MM-DD')
 member(id, poll_id, name, is_anchor 0|1)
 vote(member_id, poll_date_id, status['O'|'X'], ...)   UNIQUE(member_id, poll_date_id)
 ```
 - `confirmed_poll_date_id` 는 사양에 없던 추가 컬럼(날짜 확정 상태 저장용).
-- `deadline` 은 선택(없으면 무기한). 마감 지나면 ① 추가 투표 차단 ② green 날짜 자동 확정. 기존 Turso 테이블은 `db.ts migrate()` 가 `ALTER TABLE ... ADD COLUMN` 으로 보강.
+- `deadline` 은 선택(없으면 무기한). 마감 지나면 ① 추가 투표 차단 ② green 날짜 자동 확정.
+- `manage_token` 은 방장 전용 비밀 토큰. 방장은 `?t=토큰` 링크 보유 → 확정/수정/삭제 가능. **토큰은 절대 PollMeta/PollBundle 로 클라이언트에 노출 안 함**(`verifyManage` 서버 검증). 토큰 없는 레거시 방은 하위호환으로 누구나 가능.
+- 기존 Turso 테이블은 `db.ts migrate()` 가 `ALTER TABLE ... ADD COLUMN` 으로 보강(deadline, manage_token).
 
 ## 추천 알고리즘 (lib/recommend.ts `analyze`)
 각 날짜: `available = O 찍은 사람`, `anchorsOk = 모든 앵커가 O`, `count`, `quorumOk = count>=정족수`.
@@ -63,16 +67,18 @@ vote(member_id, poll_date_id, status['O'|'X'], ...)   UNIQUE(member_id, poll_dat
 - **카톡 OG 캐시**: 전에 공유한 링크는 미리보기가 안 바뀜. 새 링크/`?v=1` 로 우회
 - **회사망 TLS 검사(MITM)**: 사내 네트워크에선 ngrok 실패(cert), cloudflared(QUIC)는 됨. Turso/Vercel CLI도 막힐 수 있어 **브라우저 대시보드 권장**
 - **Node 25 + libSQL**: 로컬 파일 모드 정상 동작 확인됨
+- **방장 토큰**: `manage_token` 은 `?t=` 쿼리로만 전달되고 서버 `verifyManage` 로만 검증. PollMeta/PollBundle 에 절대 싣지 말 것(싣는 순간 모든 뷰어에게 노출). 방장이 토큰 붙은 결과 링크를 그대로 공유하면 유출되므로, 친구 공유용 링크(ShareBar/CopyLine)는 토큰 없는 URL만 만든다.
+- **카카오 공유**: `NEXT_PUBLIC_KAKAO_JS_KEY`(공개 JS키) 가 Vercel env 에 있어야 카톡 리치 카드 전송. 없으면 `KakaoInit` 이 SDK 자체를 안 불러오고 웹공유/복사로 폴백(에러 아님). 카카오 개발자 콘솔에 도메인(seoreunpick.vercel.app) 등록 필요.
 
 ## 지금까지 완료
 MVP → 토스 디자인 전면개편 → 미니멀(O/X, 결과 추천중심) → libSQL(Turso 대비) → Vercel 배포 → OG 이미지/메타 + 카톡 복붙 문구(킥) + 사유 칩 + 결과 OG fix. **전부 라이브 + 검증 완료.**
 
 ## 다음 후보 (TODO)
-- [x] **마감일 + 자동 확정** — 방 생성 시 마감일(선택). 마감 지나면 투표 차단 + green(앵커+정족수 충족) 날짜 자동 확정(없으면 방장이 직접). 결과에 D-day, 미응답 독촉 문구 버튼. 자동 확정은 cron 없이 `db.ts getPollBundle` 읽는 시점 lazy 처리(KST 기준). 마감 판정 헬퍼는 `lib/date.ts`(`todayKstYmd`/`isDeadlinePassed`/`deadlineLabel`).
-- [ ] **카카오 공유 SDK** (복사 대신 진짜 카톡 리치 카드 전송)
-- [ ] **카카오 로그인** (본인확인 → 이름 고르기 제거)
-- [ ] 방 수정/삭제, 방장만 확정(권한)
-- [ ] 미응답자 콕 독촉 멘트 버튼, 확정 시 축하 연출
+- [x] **마감일 + 자동 확정** — 방 생성 시 마감일(선택). 마감 지나면 투표 차단 + green(앵커+정족수 충족) 날짜 자동 확정(없으면 방장이 직접). 결과에 D-day. 자동 확정은 cron 없이 `db.ts getPollBundle` 읽는 시점 lazy 처리(KST 기준). 마감 헬퍼 `lib/date.ts`(`todayKstYmd`/`isDeadlinePassed`/`deadlineLabel`).
+- [x] **방 수정/삭제 + 방장만 확정** — `manage_token` 기반. 방장 링크(`?t=`)로만 확정/수정/삭제. 수정은 제목/정족수/마감일만(날짜·멤버는 범위 밖).
+- [x] **미응답 콕 독촉 + 확정 축하** — 결과 "안 한 사람" 칩 탭 시 개인 맞춤 독촉 복사(`PokeButton`) + 전체 독촉 버튼. 확정 시 컨페티(`Celebrate`, 브라우저당 1회).
+- [x] **카카오 공유 SDK** — `KakaoInit`(키 있을 때만 SDK 로드) + `ShareBar` 리치 카드 전송, 키 없으면 웹공유/복사로 자동 폴백. **`NEXT_PUBLIC_KAKAO_JS_KEY` env 필요**(없으면 기존 동작).
+- [ ] **카카오 로그인** — 보류(로그인 마찰 = 무인증 결정과 충돌, DECISIONS 참고).
 
 ## 로컬 실행
 ```bash

@@ -40,6 +40,15 @@ const config: Config = {
         card: '0 1px 2px rgba(16,24,40,.04)',
         float: '0 4px 16px rgba(16,24,40,.10)',
       },
+      keyframes: {
+        'confetti-fall': {
+          '0%': { transform: 'translateY(-12%) rotate(0deg)', opacity: '1' },
+          '100%': { transform: 'translateY(110vh) rotate(540deg)', opacity: '0' },
+        },
+      },
+      animation: {
+        'confetti-fall': 'confetti-fall 1.6s ease-in forwards',
+      },
     },
   },
   plugins: [],

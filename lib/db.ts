@@ -10,6 +10,7 @@ import type {
   PollBundle,
   PollMeta,
   PollStatus,
+  UpdatePollInput,
   VoteEntry,
   VoteRow,
   VoteStatus,
@@ -33,6 +34,7 @@ CREATE TABLE IF NOT EXISTS poll (
   status                 TEXT NOT NULL DEFAULT 'open',
   confirmed_poll_date_id INTEGER,
   deadline               TEXT,
+  manage_token           TEXT,
   created_at             TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -95,6 +97,7 @@ async function init(): Promise<void> {
 /** 이미 만들어진(운영 Turso) 테이블에 누락 컬럼을 더한다. CREATE IF NOT EXISTS 로는 못 한다. */
 async function migrate(): Promise<void> {
   await addColumnIfMissing('poll', 'deadline', 'TEXT')
+  await addColumnIfMissing('poll', 'manage_token', 'TEXT')
 }
 async function addColumnIfMissing(table: string, column: string, type: string): Promise<void> {
   const info = await client.execute(`PRAGMA table_info(${table})`)
@@ -121,13 +124,14 @@ function mapPoll(row: Row): PollMeta {
 
 // ── 쓰기 ─────────────────────────────────────────────────────────────────────
 
-export async function createPoll(input: CreatePollInput): Promise<string> {
+export async function createPoll(input: CreatePollInput): Promise<{ id: string; manageToken: string }> {
   await ready()
   const id = input.id ?? newId()
+  const manageToken = input.manageToken ?? newId(16) // 방장 전용 비밀 토큰(추측 어렵게 16자)
   const stmts: InStatement[] = [
     {
-      sql: `INSERT INTO poll (id, title, host_name, quorum, status, deadline) VALUES (?, ?, ?, ?, 'open', ?)`,
-      args: [id, input.title, input.hostName, input.quorum, input.deadline ?? null],
+      sql: `INSERT INTO poll (id, title, host_name, quorum, status, deadline, manage_token) VALUES (?, ?, ?, ?, 'open', ?, ?)`,
+      args: [id, input.title, input.hostName, input.quorum, input.deadline ?? null, manageToken],
     },
     ...input.dates.map((d) => ({
       sql: `INSERT INTO poll_date (poll_id, date) VALUES (?, ?)`,
@@ -139,7 +143,44 @@ export async function createPoll(input: CreatePollInput): Promise<string> {
     })),
   ]
   await client.batch(stmts, 'write')
-  return id
+  return { id, manageToken }
+}
+
+/**
+ * 방장 권한 확인. 저장된 토큰과 일치해야 true.
+ * 단, 토큰이 없는 레거시 방(이 기능 이전 생성)은 누구나 가능(하위호환).
+ * 토큰은 절대 PollBundle/PollMeta 로 클라이언트에 노출하지 않는다.
+ */
+export async function verifyManage(pollId: string, token: string | null | undefined): Promise<boolean> {
+  await ready()
+  const res = await client.execute({ sql: `SELECT manage_token FROM poll WHERE id = ?`, args: [pollId] })
+  if (res.rows.length === 0) return false
+  const stored = res.rows[0].manage_token
+  if (stored == null) return true // 레거시 방 = 개방
+  return !!token && token === String(stored)
+}
+
+/** 방 메타(제목/정족수/마감일) 수정. 날짜·멤버는 건드리지 않는다. */
+export async function updatePollMeta(pollId: string, input: UpdatePollInput): Promise<void> {
+  await ready()
+  await client.execute({
+    sql: `UPDATE poll SET title = ?, quorum = ?, deadline = ? WHERE id = ?`,
+    args: [input.title, input.quorum, input.deadline, pollId],
+  })
+}
+
+/** 방 삭제. 자식 행(날짜/멤버/투표)도 함께 지운다(FK CASCADE 미보장 환경 대비 명시 삭제). */
+export async function deletePoll(pollId: string): Promise<void> {
+  await ready()
+  await client.batch(
+    [
+      { sql: `DELETE FROM vote WHERE poll_id = ?`, args: [pollId] },
+      { sql: `DELETE FROM poll_date WHERE poll_id = ?`, args: [pollId] },
+      { sql: `DELETE FROM member WHERE poll_id = ?`, args: [pollId] },
+      { sql: `DELETE FROM poll WHERE id = ?`, args: [pollId] },
+    ],
+    'write',
+  )
 }
 
 /** 한 멤버의 날짜별 응답을 일괄 upsert. 기존 응답은 덮어쓴다. */

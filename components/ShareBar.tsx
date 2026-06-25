@@ -4,10 +4,18 @@ import { useEffect, useState } from 'react'
 
 interface Props {
   pollId: string
+  title?: string
   highlight?: boolean // 방 생성 직후 강조
 }
 
-export default function ShareBar({ pollId, highlight }: Props) {
+type KakaoSDK = {
+  isInitialized: () => boolean
+  Share?: { sendDefault: (o: unknown) => void }
+}
+
+const kakaoEnabled = !!process.env.NEXT_PUBLIC_KAKAO_JS_KEY
+
+export default function ShareBar({ pollId, title, highlight }: Props) {
   const [origin, setOrigin] = useState('')
   const [copied, setCopied] = useState<'vote' | 'result' | null>(null)
 
@@ -31,6 +39,26 @@ export default function ShareBar({ pollId, highlight }: Props) {
   }
 
   async function share() {
+    // 1순위: 카카오 공유 SDK(리치 카드). 키/SDK 없으면 자동으로 아래 폴백으로 내려간다.
+    const k = (window as unknown as { Kakao?: KakaoSDK }).Kakao
+    if (k?.isInitialized?.() && k.Share) {
+      try {
+        k.Share.sendDefault({
+          objectType: 'feed',
+          content: {
+            title: title || '모임 날짜 투표',
+            description: '되는 날 O/X 한 번만 찍어줘! 서른픽',
+            imageUrl: `${origin}/poll/${pollId}/opengraph-image`,
+            link: { mobileWebUrl: voteUrl, webUrl: voteUrl },
+          },
+          buttons: [{ title: '투표하러 가기', link: { mobileWebUrl: voteUrl, webUrl: voteUrl } }],
+        })
+        return
+      } catch {
+        /* SDK 실패 → 폴백 */
+      }
+    }
+    // 2순위: 웹 공유 시트
     if (navigator.share) {
       try {
         await navigator.share({ title: '모임 날짜 투표', text: '날짜 투표해줘! 🗓️', url: voteUrl })
@@ -39,6 +67,7 @@ export default function ShareBar({ pollId, highlight }: Props) {
         /* 사용자가 취소 → 무시 */
       }
     }
+    // 3순위: 링크 복사
     copy('vote')
   }
 
@@ -60,7 +89,7 @@ export default function ShareBar({ pollId, highlight }: Props) {
           onClick={share}
           className="h-12 flex-1 rounded-xl bg-brand text-[15px] font-bold text-white active:bg-brand-dark active:scale-[0.99]"
         >
-          {copied === 'vote' ? '복사됨 ✓' : '🔗 투표 링크 공유'}
+          {copied === 'vote' ? '복사됨 ✓' : kakaoEnabled ? '💬 카톡으로 공유' : '🔗 투표 링크 공유'}
         </button>
         <button
           type="button"

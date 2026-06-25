@@ -49,6 +49,14 @@ export interface CreatePollInput {
   dates: string[]
   members: { name: string; isAnchor: boolean }[]
   deadline?: string | null // YYYY-MM-DD (선택). 없으면 무기한
+  manageToken?: string // 시드용 고정 토큰 (없으면 자동 생성)
+}
+
+/** 방 메타 수정 입력 (방장 전용, 날짜/멤버는 제외) */
+export interface UpdatePollInput {
+  title: string
+  quorum: number
+  deadline: string | null
 }
 
 /** 투표 제출 입력 (한 멤버의 날짜별 응답) */
