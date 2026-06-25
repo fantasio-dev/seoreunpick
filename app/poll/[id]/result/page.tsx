@@ -121,14 +121,16 @@ export default async function ResultPage({
               <ConfirmButton pollId={poll.id} pollDateId={confirmedDate.id} confirmed token={token} />
             )}
           </div>
-          <div className="mt-3">
-            <CopyLine
-              pollId={poll.id}
-              linkTo="result"
-              tone="ok"
-              message={`📅 "${poll.title}"\n${formatKo(confirmedDate.date)}로 정했어요! 다들 캘린더 비워두기 🙆`}
-            />
-          </div>
+          {canManage && (
+            <div className="mt-3">
+              <CopyLine
+                pollId={poll.id}
+                linkTo="result"
+                tone="ok"
+                message={`📅 "${poll.title}"\n${formatKo(confirmedDate.date)}로 정했어요! 다들 캘린더 비워두기 🙆`}
+              />
+            </div>
+          )}
         </div>
       ) : (
         <Hero
@@ -151,27 +153,41 @@ export default async function ResultPage({
           </p>
         </div>
         {rec.noResponseMembers.length > 0 ? (
-          <>
-            {/* 이름 칩을 탭하면 그 사람만 콕 찌르는 개인 독촉 문구가 복사돼요 */}
+          canManage ? (
+            <>
+              {/* 방장만: 이름 칩을 탭하면 그 사람만 콕 찌르는 개인 독촉 문구가 복사돼요 */}
+              <div className="flex flex-wrap gap-1.5">
+                {rec.noResponseMembers.map((n) => (
+                  <PokeButton key={n} pollId={poll.id} name={n} title={poll.title} />
+                ))}
+              </div>
+              <p className="mt-2 text-[12px] font-medium text-ink-400">이름을 탭하면 콕 찌르는 문구가 복사돼요</p>
+              {/* 전체 독촉 — 마감 전, 미확정일 때만 */}
+              {!confirmedDate && !votingClosed && (
+                <div className="mt-3">
+                  <CopyLine
+                    pollId={poll.id}
+                    linkTo="vote"
+                    message={`⏰ "${poll.title}" 날짜 투표 아직이에요${
+                      poll.deadline ? ` (${deadlineLabel(poll.deadline)})` : ''
+                    }\n${rec.noResponseMembers.join(', ')} 링크 열고 O/X만 찍어주면 끝이에요 🙏`}
+                  />
+                </div>
+              )}
+            </>
+          ) : (
+            // 일반 참여자: 이름만 보여주고 독촉 도구는 숨김
             <div className="flex flex-wrap gap-1.5">
               {rec.noResponseMembers.map((n) => (
-                <PokeButton key={n} pollId={poll.id} name={n} title={poll.title} />
+                <span
+                  key={n}
+                  className="rounded-full bg-surface-sunken px-3 py-1 text-[13px] font-medium text-ink-600"
+                >
+                  {n}
+                </span>
               ))}
             </div>
-            <p className="mt-2 text-[12px] font-medium text-ink-400">이름을 탭하면 콕 찌르는 문구가 복사돼요</p>
-            {/* 전체 독촉 — 마감 전, 미확정일 때만 */}
-            {!confirmedDate && !votingClosed && (
-              <div className="mt-3">
-                <CopyLine
-                  pollId={poll.id}
-                  linkTo="vote"
-                  message={`⏰ "${poll.title}" 날짜 투표 아직이에요${
-                    poll.deadline ? ` (${deadlineLabel(poll.deadline)})` : ''
-                  }\n${rec.noResponseMembers.join(', ')} 링크 열고 O/X만 찍어주면 끝이에요 🙏`}
-                />
-              </div>
-            )}
-          </>
+          )
         ) : (
           <p className="text-[13px] font-bold text-ok-ink">🎉 전원 응답 완료!</p>
         )}
@@ -242,9 +258,11 @@ function Hero({
             />
           </div>
         )}
-        <div className="mt-3">
-          <CopyLine pollId={pollId} linkTo="vote" tone="ok" message={msg} />
-        </div>
+        {canManage && (
+          <div className="mt-3">
+            <CopyLine pollId={pollId} linkTo="vote" tone="ok" message={msg} />
+          </div>
+        )}
       </div>
     )
   }
@@ -276,9 +294,11 @@ function Hero({
             💡 안 한 {a.noneNames.length}명이 모두 가능하면 확정 추천이 돼요
           </p>
         )}
-        <div className="mt-3">
-          <CopyLine pollId={pollId} linkTo="vote" message={msg} />
-        </div>
+        {canManage && (
+          <div className="mt-3">
+            <CopyLine pollId={pollId} linkTo="vote" message={msg} />
+          </div>
+        )}
       </div>
     )
   }
@@ -287,14 +307,18 @@ function Hero({
   return (
     <div className="mb-5 rounded-2xl bg-brand-light p-5 text-center">
       <p className="text-sm font-bold text-brand-dark">아직 아무도 투표하지 않았어요</p>
-      <p className="mt-1 text-[13px] font-medium text-ink-600">멤버들에게 링크를 보내볼까요?</p>
-      <div className="mt-3 text-left">
-        <CopyLine
-          pollId={pollId}
-          linkTo="vote"
-          message={`🗓️ "${title}" 날짜 정하자!\n링크 열어서 되는 날 O/X 찍어줘 🙏`}
-        />
-      </div>
+      {canManage && (
+        <>
+          <p className="mt-1 text-[13px] font-medium text-ink-600">멤버들에게 링크를 보내볼까요?</p>
+          <div className="mt-3 text-left">
+            <CopyLine
+              pollId={pollId}
+              linkTo="vote"
+              message={`🗓️ "${title}" 날짜 정하자!\n링크 열어서 되는 날 O/X 찍어줘 🙏`}
+            />
+          </div>
+        </>
+      )}
     </div>
   )
 }
