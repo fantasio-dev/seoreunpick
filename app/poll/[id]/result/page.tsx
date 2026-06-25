@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation'
 import Celebrate from '@/components/Celebrate'
 import ConfirmButton from '@/components/ConfirmButton'
 import CopyLine from '@/components/CopyLine'
+import DateVoters from '@/components/DateVoters'
 import PokeButton from '@/components/PokeButton'
 import RememberRoom from '@/components/RememberRoom'
 import ShareBar from '@/components/ShareBar'
@@ -206,6 +207,24 @@ export default async function ResultPage({
           </div>
         </section>
       )}
+
+      {/* 날짜별 응답 현황 — 누가 가능/불가/미응답인지 (날짜 순, 탭하면 펼침) */}
+      <section className="mb-7">
+        <h2 className="mb-2 text-[13px] font-bold text-ink-500">날짜별 응답 현황</h2>
+        <div className="card divide-y divide-line/70">
+          {rec.analyses.map((a) => (
+            <DateVoters
+              key={a.pollDateId}
+              date={a.date}
+              tier={a.tier}
+              count={a.count}
+              oNames={a.oNames}
+              xNames={a.xNames}
+              noneNames={a.noneNames}
+            />
+          ))}
+        </div>
+      </section>
 
       <div className="text-center">
         <Link href={`/poll/${poll.id}`} className="text-sm font-bold text-brand">
